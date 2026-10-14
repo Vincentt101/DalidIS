@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Payment Announcer</string>
+    <string name="listener_label">Payment Announcer</string>
+
+    <string name="section_permissions">Permissions</string>
+    <string name="section_voice">Voice</string>
+    <string name="section_apps">Apps to watch</string>
+    <string name="section_last">Last captured notification</string>
+
+    <string name="status_access_granted">✓ Notification access granted</string>
+    <string name="status_access_missing">✗ Notification access not granted</string>
+    <string name="open_notification_access">Open Notification Access settings</string>
+    <string name="restricted_hint">Toggle greyed out (\"Restricted setting\")? Open App info, tap ⋮ (top right) → \"Allow restricted settings\", then try again.</string>
+    <string name="open_app_info">Open App info</string>
+
+    <string name="status_battery_ok">✓ Battery: unrestricted</string>
+    <string name="status_battery_optimized">✗ Battery: optimized (announcements may be delayed or stop)</string>
+    <string name="disable_battery_optimization">Disable battery optimization</string>
+    <string name="battery_dialog_title">Keep announcing in the background?</string>
+    <string name="battery_dialog_message">Android may pause this app to save battery, which can make it miss payments. Allow it to run unrestricted?</string>
+    <string name="battery_dialog_allow">Allow</string>
+    <string name="not_now">Not now</string>
+
+    <string name="announce_payments">Announce payments</string>
+    <string name="test_voice">Test voice</string>
+
+    <string name="add_app">Add app</string>
+    <string name="no_apps">No apps selected. Tap \"Add app\".</string>
+    <string name="pick_app_title">Choose an app to watch</string>
+    <string name="enter_package_manually">Enter package name</string>
+    <string name="invalid_package">That doesn\'t look like a package name</string>
+    <string name="not_installed">%1$s (not installed)</string>
+    <string name="remove">Remove</string>
+    <string name="last_captured_none">Nothing yet. Notifications from watched apps will show here.</string>
+</resources>
