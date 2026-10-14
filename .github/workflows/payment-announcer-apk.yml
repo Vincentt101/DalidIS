@@ -1,0 +1,78 @@
+name: Build Payment Announcer APK
+
+# Builds the Android app and publishes the APK as a GitHub Release, so it can be
+# downloaded straight to a phone from the repo's Releases page.
+on:
+  push:
+    paths:
+      - "payment-announcer/**"
+      - ".github/workflows/payment-announcer-apk.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: payment-announcer
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # Optional: a fixed signing key so new versions install over old ones.
+      # Add repo secrets KEYSTORE_BASE64, KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD (see README).
+      - name: Set up release signing
+        id: signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > release.jks
+            printf 'storeFile=release.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
+              "$KEYSTORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD" > keystore.properties
+            echo "variant=release" >> "$GITHUB_OUTPUT"
+          else
+            echo "variant=debug" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run unit tests
+        run: ./gradlew --no-daemon testDebugUnitTest
+
+      - name: Build APK
+        run: |
+          if [ "${{ steps.signing.outputs.variant }}" = "release" ]; then
+            ./gradlew --no-daemon assembleRelease
+            cp app/build/outputs/apk/release/app-release.apk PaymentAnnouncer.apk
+          else
+            ./gradlew --no-daemon assembleDebug
+            cp app/build/outputs/apk/debug/app-debug.apk PaymentAnnouncer.apk
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PaymentAnnouncer-apk
+          path: payment-announcer/PaymentAnnouncer.apk
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: payment-announcer-build-${{ github.run_number }}
+          name: Payment Announcer (build ${{ github.run_number }})
+          target_commitish: ${{ github.sha }}
+          make_latest: true
+          files: payment-announcer/PaymentAnnouncer.apk
+          body: |
+            Download **PaymentAnnouncer.apk** below on your Android phone, open it, and allow
+            "Install unknown apps" when asked. Setup steps: see payment-announcer/README.md.

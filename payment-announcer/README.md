@@ -17,6 +17,29 @@ If the text doesn't match a known payment format, it reads the notification as-i
 - Kotlin, min SDK 26 (Android 8.0), target SDK 35
 - No internet permission. Nothing leaves the phone.
 
+## Install on your phone (no computer needed)
+
+GitHub builds the app automatically (`.github/workflows/payment-announcer-apk.yml`) every
+time this folder changes, and posts the installable file on the repo's **Releases** page.
+
+1. On your phone, open **https://github.com/Vincentt101/DalidIS/releases/latest**
+2. Under **Assets**, tap **PaymentAnnouncer.apk** to download it.
+3. Open the downloaded file. When Android asks, allow your browser or Files app to
+   **Install unknown apps**, then tap **Install**.
+   - If Play Protect warns *"Unsafe app blocked"* or *"App scan"*, tap **More details →
+     Install anyway**. It warns about every app that doesn't come from the Play Store.
+4. Follow [First-run setup on the phone](#first-run-setup-on-the-phone) below.
+
+If the Releases page is empty, open the repo's **Actions** tab, choose
+**Build Payment Announcer APK**, and tap **Run workflow**. Wait about 5 minutes and check
+Releases again.
+
+**Updating to a new build:** without a fixed signing key, each build is signed with a
+different temporary key, so Android refuses to install it over the old one
+(*"App not installed"* or *"package conflicts"*). Uninstall the old version first. Your watched
+apps and the access settings will need to be set up again. To avoid this, add a fixed key
+(see [Fixed signing key for GitHub builds](#fixed-signing-key-for-github-builds)).
+
 ## How it works
 
 | File | Role |
@@ -98,6 +121,19 @@ EOF
 
 `keystore.properties` and `*.jks` are git-ignored. Keep the keystore safe: updates must be
 signed with the same key.
+
+### Fixed signing key for GitHub builds
+
+Once these four repository secrets exist (**Settings → Secrets and variables → Actions → New
+repository secret**), the workflow builds a signed release APK, and future builds install
+over the previous one:
+
+| Secret | Value |
+|---|---|
+| `KEYSTORE_BASE64` | output of `base64 -w0 release.jks` (macOS: `base64 -i release.jks`) |
+| `KEYSTORE_PASSWORD` | the store password |
+| `KEY_ALIAS` | `announcer` (or whatever alias you used) |
+| `KEY_PASSWORD` | the key password |
 
 ## Install (sideload)
 
