@@ -44,6 +44,10 @@ class Prefs(context: Context) {
         val DEFAULT_PACKAGES = setOf(
             "com.paypal.android.p2pmobile", // PayPal
             "com.transferwise.android",     // Wise
+            "com.globe.gcash.android",      // GCash
+            "com.paymaya",                  // Maya (PayMaya)
+            "ph.com.gotyme",                // GoTyme Bank
+            "ph.seabank.seabank",           // MariBank PH (formerly SeaBank)
         )
     }
 }

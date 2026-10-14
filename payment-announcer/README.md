@@ -1,9 +1,15 @@
 # Payment Announcer (Android)
 
-Reads incoming payments out loud. When PayPal, Wise, your bank app or any other app you pick
-posts a notification like **"Maria Santos sent you $350.00"**, the phone says:
+Reads incoming payments out loud. When PayPal, Wise, GCash, Maya, GoTyme, MariBank or any
+other app you pick posts a notification like **"Maria Santos sent you $350.00"**, the phone
+says:
 
 > "You have received $350 from Maria Santos."
+
+Peso amounts are said as pesos. For example, *"You have received PHP 500.00 of GCash from
+JUAN DELA CRUZ…"* is read as:
+
+> "You have received 500 pesos from Juan Dela Cruz."
 
 If the text doesn't match a known payment format, it reads the notification as-is
 (e.g. *"PayPal: Payment received. Your balance was updated"*).
@@ -31,11 +37,19 @@ The phrasing doesn't need to match exactly or be in the same case.
 - `You received $350.00 from John Doe` / `You've received €200 from …` / `You got $5 from …`
 - `Payment of $99.99 received from Jane Smith. Ref 12345`
 - `$350.00 received from John Doe` / `£5.00 has been credited from Tom to your account`
+- GCash: `You have received PHP 500.00 of GCash from JUAN DELA CRUZ w/ MSISDN 0917…`
+- Maya / banks: `You've received ₱250.50 from …`, `You have received PHP 1,000.00 via InstaPay from …`,
+  `Php3,000.00 from … thru PESONet`
 
 Amounts: currency symbols `$ € £ ¥ ₹ ₱ ₩ ₦ ₺ ₽`, ISO codes before or after the number
-(`PHP 1,500.00`, `40.00 CAD`), and thousands separators. `.00` is dropped so it says
-"$350", not "$350 point zero zero". Trailing clauses such as `on 14 Oct`, `via InstaPay` or
-`to your account` are cut from the sender name.
+(`PHP 1,500.00`, `Php500`, `40.00 CAD`), the `P100.00` peso shorthand, and thousands
+separators. `.00` is dropped so it says "$350", not "$350 point zero zero". Philippine peso
+amounts are spoken as "1,500 pesos and 50 centavos".
+
+Sender names: trailing clauses such as `on 14 Oct`, `via InstaPay`, `w/ MSISDN 0917…`, a
+mobile number, or `to your account` are cut off. Asterisks in masked names (`JU** DE** C.`)
+are removed. ALL-CAPS names are read in normal case ("Juan Dela Cruz"), so the voice doesn't
+spell them out letter by letter.
 
 **Adding your bank's wording:** grant access, receive a payment, then look at the
 *Last captured notification* section on the settings screen to see the exact title and
@@ -108,8 +122,21 @@ app, and allow *Install unknown apps* for that app when asked.
      **Allow restricted settings**, confirm with your PIN, and go back and turn the toggle on.
 3. When asked *Keep announcing in the background?*, tap **Allow**. You can also use the
    **Disable battery optimization** button later.
-4. Under **Apps to watch**, PayPal and Wise are already on the list. Tap **Add app** to pick
-   your bank app from the installed apps, or enter a package name.
+4. Under **Apps to watch**, these are pre-filled:
+
+   | App | Package |
+   |---|---|
+   | PayPal | `com.paypal.android.p2pmobile` |
+   | Wise | `com.transferwise.android` |
+   | GCash | `com.globe.gcash.android` |
+   | Maya | `com.paymaya` |
+   | GoTyme Bank | `ph.com.gotyme` |
+   | MariBank PH | `ph.seabank.seabank` |
+
+   Apps you don't have are marked *(not installed)*. Remove them with ✕ if you like. If an app
+   you *do* have shows as not installed, its package name is different on your phone: remove
+   it, then tap **Add app** and pick it from the list of installed apps. Use **Add app** for
+   any other bank too (BDO, BPI, UnionBank, etc.).
 5. Tap **Test voice**. You should hear *"You have received $350 from Test Sender."*
    If you hear nothing, raise the **media** volume and check
    **Settings → Accessibility → Text-to-speech output** (install *Speech Services by Google*

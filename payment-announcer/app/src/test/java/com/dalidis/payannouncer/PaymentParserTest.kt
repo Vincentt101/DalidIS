@@ -31,7 +31,7 @@ class PaymentParserTest {
     }
 
     @Test fun codeOnlyMapsToSymbol() {
-        assertEquals("You have received ₱1,500 from Juan Dela Cruz.", speech("You received PHP 1,500.00 from Juan Dela Cruz."))
+        assertEquals("You have received 1,500 pesos from Juan Dela Cruz.", speech("You received PHP 1,500.00 from Juan Dela Cruz."))
         assertEquals("You have received €20 from Anna.", speech("Anna sent you 20.00 EUR"))
     }
 
@@ -40,7 +40,7 @@ class PaymentParserTest {
     }
 
     @Test fun bankStyleTrailingClause() {
-        assertEquals("You have received $350 from JOHN DOE.", speech("You received $350.00 from JOHN DOE on 14 Oct via InstaPay"))
+        assertEquals("You have received $350 from John Doe.", speech("You received $350.00 from JOHN DOE on 14 Oct via InstaPay"))
         assertEquals("You have received $99.99 from Jane Smith.", speech("Payment of $99.99 received from Jane Smith. Ref 12345"))
         assertEquals("You have received £5 from Tom.", speech("£5.00 has been credited from Tom to your account"))
     }
@@ -56,6 +56,41 @@ class PaymentParserTest {
     @Test fun candidatesInOrder() {
         val p = PaymentParser.parse(listOf(null, "PayPal", "Kim sent you $8.00"))
         assertEquals("You have received $8 from Kim.", p?.toSpeech())
+    }
+
+    // ---- Philippine e-wallets and banks ----
+
+    @Test fun gcash() {
+        assertEquals(
+            "You have received 500 pesos from Juan Dela Cruz.",
+            speech("You have received PHP 500.00 of GCash from JUAN DELA CRUZ w/ MSISDN 09171234567. Your new balance is PHP 1,200.00. Ref. No. 1234567890")
+        )
+        assertEquals(
+            "You have received 100 pesos from Ju De C.",
+            speech("You have received P100.00 of GCash from JU** DE** C. 09171234567.")
+        )
+    }
+
+    @Test fun maya() {
+        assertEquals("You have received 250 pesos and 50 centavos from Maria Santos.", speech("You've received ₱250.50 from Maria Santos"))
+        assertEquals("You have received 1 peso from Ana.", speech("Received ₱1.00 from Ana via InstaPay"))
+    }
+
+    @Test fun instaPayBankTransfer() {
+        // GoTyme / MariBank / other banks receiving via InstaPay or PESONet
+        assertEquals(
+            "You have received 1,000 pesos from Juan Dela Cruz.",
+            speech("You have received PHP 1,000.00 via InstaPay from JUAN DELA CRUZ.")
+        )
+        assertEquals(
+            "You have received 3,000 pesos from Pedro Reyes.",
+            speech("Incoming transfer: Php3,000.00 from PEDRO REYES thru PESONet")
+        )
+        assertEquals("You have received 75 pesos from Liza.", speech("Liza sent you ₱75"))
+    }
+
+    @Test fun balanceAloneIsNotAPayment() {
+        assertNull(PaymentParser.parse("Your new balance is PHP 1,200.00"))
     }
 
     @Test fun nonPaymentReturnsNull() {
