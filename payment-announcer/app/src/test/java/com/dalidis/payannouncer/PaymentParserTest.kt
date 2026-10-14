@@ -98,4 +98,13 @@ class PaymentParserTest {
         assertNull(PaymentParser.parse("You have 3 new messages from John"))
         assertNull(PaymentParser.parse("You sent $20.00 to Mike"))
     }
+
+    @Test fun nonIncomingPhNotificationsAreIgnored() {
+        assertNull(PaymentParser.parse("You have sent PHP 500.00 of GCash to JUAN DELA CRUZ w/ MSISDN 09171234567."))
+        assertNull(PaymentParser.parse("You have paid PHP 1,250.00 to MERALCO. Ref. No. 1234567890"))
+        assertNull(PaymentParser.parse("Your OTP is 123456. Do not share it with anyone."))
+        assertNull(PaymentParser.parse("Get up to ₱500 cashback when you pay with Maya!"))
+        assertNull(PaymentParser.parse("You transferred ₱2,000.00 to BPI account ending 1234 via InstaPay"))
+        assertNull(PaymentParser.parse("Load purchase of P50.00 for 09171234567 was successful"))
+    }
 }

@@ -64,21 +64,17 @@ class PaymentNotificationListener : NotificationListenerService() {
         val payment = PaymentParser.parse(
             listOf(bigText, text, lines, title, listOfNotNull(title, body).joinToString(" "))
         )
-        val utterance = payment?.toSpeech() ?: rawUtterance(sbn.packageName, title, body)
+        // Only incoming money is announced. Everything else (promos, OTPs, outgoing
+        // transfers, bills) stays silent but is still logged so missed wordings can be added.
+        val utterance = payment?.toSpeech()
 
         prefs.lastCaptured = buildString {
             append(appLabel(this@PaymentNotificationListener, sbn.packageName))
             append("\nTitle: ").append(title.orEmpty())
             append("\nText: ").append(body.orEmpty())
-            append("\nSpoken: ").append(utterance)
+            append("\nSpoken: ").append(utterance ?: "(nothing - not an incoming payment)")
         }
-        speaker.speak(utterance)
-    }
-
-    /** Fallback when the text doesn't look like an incoming payment: read it as-is. */
-    private fun rawUtterance(pkg: String, title: String?, body: String?): String {
-        val parts = listOfNotNull(title?.takeIf { it.isNotBlank() }, body?.takeIf { it.isNotBlank() })
-        return "${appLabel(this, pkg)}: ${parts.joinToString(". ")}"
+        if (utterance != null) speaker.speak(utterance)
     }
 
     private fun isDuplicate(key: String): Boolean {

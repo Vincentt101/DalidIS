@@ -11,8 +11,10 @@ JUAN DELA CRUZ…"* is read as:
 
 > "You have received 500 pesos from Juan Dela Cruz."
 
-If the text doesn't match a known payment format, it reads the notification as-is
-(e.g. *"PayPal: Payment received. Your balance was updated"*).
+**Only incoming money is announced.** Everything else from those apps stays silent:
+outgoing transfers, bill payments, load purchases, OTPs, promos and balance updates. Ignored
+notifications still appear under *Last captured notification* in the app, marked
+*"Spoken: (nothing - not an incoming payment)"*.
 
 - Kotlin, min SDK 26 (Android 8.0), target SDK 35
 - No internet permission. Nothing leaves the phone.
@@ -44,7 +46,7 @@ apps and the access settings will need to be set up again. To avoid this, add a 
 
 | File | Role |
 |---|---|
-| `PaymentNotificationListener.kt` | `NotificationListenerService`. Filters by watched package, skips group summaries, ongoing notifications and repeats within 30 s, then parses and speaks. |
+| `PaymentNotificationListener.kt` | `NotificationListenerService`. Filters by watched package, skips group summaries, ongoing notifications and repeats within 30 s, then speaks only if the text is an incoming payment. |
 | `PaymentParser.kt` | Regex rules for the amount and sender (pure Kotlin, unit tested). |
 | `Speaker.kt` | `TextToSpeech` wrapper. Queues text until the engine is ready and ducks music while speaking. |
 | `SettingsActivity.kt` | Settings screen: notification access, battery optimization, on/off switch, **Test voice**, watched-app list, and the last captured notification. |
@@ -213,8 +215,9 @@ on the app: a force-stopped app loses its listener until you open it again.
   notification never reached the app.
 - **The bank's notifications are hidden on the lock screen or silenced:** the listener still
   receives them, but if the bank app's notifications are *blocked*, there is nothing to read.
-- **It reads the raw text instead of "You have received…":** the wording didn't match. Add a
-  rule (see *Adding your bank's wording* above).
+- **A real incoming payment was not announced:** check *Last captured notification*. If it
+  shows *"Spoken: (nothing - not an incoming payment)"*, that app's wording isn't recognized
+  yet. Add a rule (see *Adding your bank's wording* above).
 - **The same payment is announced twice:** repeats of identical text from the same app within
   30 s are skipped. If your bank posts two *different* notifications per payment, remove one
   of them in the bank app's notification settings, or tighten the rules.
