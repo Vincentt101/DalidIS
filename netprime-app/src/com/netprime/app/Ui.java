@@ -8,6 +8,9 @@ import android.content.res.ColorStateList;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.LinearGradient;
+import android.graphics.RadialGradient;
+import android.graphics.drawable.LayerDrawable;
+import android.os.Build;
 import android.graphics.Paint;
 import android.graphics.RectF;
 import android.graphics.Shader;
@@ -75,6 +78,15 @@ final class Ui {
         return t;
     }
 
+    /** Red glow behind a view using its shadow (Android 9+; older versions get a normal shadow). */
+    static void glow(View v, float elevationDp) {
+        v.setElevation(dp(v.getContext(), elevationDp));
+        if (Build.VERSION.SDK_INT >= 28) {
+            v.setOutlineAmbientShadowColor(RED);
+            v.setOutlineSpotShadowColor(RED_LIGHT);
+        }
+    }
+
     static GradientDrawable rounded(int color, float radius) {
         GradientDrawable g = new GradientDrawable();
         g.setColor(color);
@@ -123,8 +135,8 @@ final class Ui {
             col.addView(tag, tlp);
 
             LoaderBar bar = new LoaderBar(c);
-            LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(dp(c, 160), dp(c, 3));
-            blp.topMargin = dp(c, 36);
+            LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(dp(c, 180), dp(c, 16));
+            blp.topMargin = dp(c, 30);
             col.addView(bar, blp);
 
             addView(col, new LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -201,18 +213,24 @@ final class Ui {
             super.onDetachedFromWindow();
         }
 
+        private final Paint halo = new Paint(Paint.ANTI_ALIAS_FLAG);
+
         @Override
         protected void onDraw(Canvas c) {
-            float w = getWidth(), h = getHeight(), rad = h / 2;
-            r.set(0, 0, w, h);
+            // 3dp pill track in the middle; the extra height is room for the glow.
+            float w = getWidth(), bh = dp(getContext(), 3), top = (getHeight() - bh) / 2, rad = bh / 2;
+            r.set(0, top, w, top + bh);
             c.drawRoundRect(r, rad, rad, track);
             float segW = w * 0.35f;
             float x = -segW + (w + segW) * t;
+            float head = Math.min(Math.max(x + segW, 0), w), cy = getHeight() / 2f, gr = getHeight() * 0.9f;
+            halo.setShader(new RadialGradient(head, cy, gr, 0x99FF3D57, 0x00E50914, Shader.TileMode.CLAMP));
+            c.drawCircle(head, cy, gr, halo);
             seg.setShader(new LinearGradient(x, 0, x + segW, 0,
-                    new int[] { 0x00E50914, RED, RED_LIGHT }, null, Shader.TileMode.CLAMP));
+                    new int[] { 0x00E50914, RED, 0xFFFF6B7F }, null, Shader.TileMode.CLAMP));
             c.save();
-            c.clipRect(0, 0, w, h);
-            r.set(x, 0, x + segW, h);
+            c.clipRect(0, 0, w, getHeight());
+            r.set(x, top, x + segW, top + bh);
             c.drawRoundRect(r, rad, rad, seg);
             c.restore();
         }
@@ -248,13 +266,21 @@ final class Ui {
             if (percent >= 100) animate().alpha(0f).setStartDelay(250).setDuration(300).start();
         }
 
+        private final Paint halo = new Paint(Paint.ANTI_ALIAS_FLAG);
+
         @Override
         protected void onDraw(Canvas c) {
             float w = getWidth() * shown;
             if (w <= 0) return;
+            float bh = dp(getContext(), 3), gr = dp(getContext(), 14);
+            // soft glow under the line and a brighter glow at its tip
+            halo.setShader(new LinearGradient(0, 0, 0, gr, 0x40E50914, 0x00E50914, Shader.TileMode.CLAMP));
+            c.drawRect(0, 0, w, gr, halo);
+            halo.setShader(new RadialGradient(w, bh / 2, gr, 0xB3FF3D57, 0x00E50914, Shader.TileMode.CLAMP));
+            c.drawCircle(w, bh / 2, gr, halo);
             p.setShader(new LinearGradient(0, 0, Math.max(w, 1), 0,
-                    RED_DARK, RED_LIGHT, Shader.TileMode.CLAMP));
-            c.drawRect(0, 0, w, getHeight(), p);
+                    RED_DARK, 0xFFFF6B7F, Shader.TileMode.CLAMP));
+            c.drawRoundRect(new RectF(0, 0, w, bh), bh / 2, bh / 2, p);
         }
     }
 
@@ -273,12 +299,30 @@ final class Ui {
         Hint(Context c) {
             super(c);
             label = text(c, "", 15, TEXT, medium);
-            label.setGravity(Gravity.CENTER);
-            GradientDrawable bg = rounded(0xE6141419, dp(c, 999));
-            bg.setStroke(dp(c, 1), STROKE);
+            label.setGravity(Gravity.CENTER_VERTICAL);
+            float r = dp(c, 999);
+            GradientDrawable border = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
+                    new int[] { 0xCCFF3D57, 0x33FFFFFF, 0xCCFF3D57 });
+            border.setCornerRadius(r);
+            GradientDrawable fill = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                    new int[] { 0xF21C1C24, 0xF20E0E13 });
+            fill.setCornerRadius(r);
+            LayerDrawable bg = new LayerDrawable(new Drawable[] { border, fill });
+            int in = Math.max(1, dp(c, 1.2f));
+            bg.setLayerInset(1, in, in, in, in);
             label.setBackground(bg);
-            label.setPadding(dp(c, 22), dp(c, 12), dp(c, 22), dp(c, 12));
-            label.setElevation(dp(c, 8));
+            GradientDrawable dotD = new GradientDrawable();
+            dotD.setShape(GradientDrawable.OVAL);
+            dotD.setColor(RED_LIGHT);
+            dotD.setStroke(dp(c, 2), 0x55FF3D57);
+            dotD.setSize(dp(c, 10), dp(c, 10));
+            label.setCompoundDrawablesRelativeWithIntrinsicBounds(dotD, null, null, null);
+            label.setCompoundDrawablePadding(dp(c, 12));
+            label.setPadding(dp(c, 18), dp(c, 13), dp(c, 24), dp(c, 13));
+            glow(label, 14);
+            setClipChildren(false);
+            setClipToPadding(false);
+            setPadding(0, dp(c, 16), 0, dp(c, 16));
             addView(label, new LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER));
             setAlpha(0f);
@@ -335,6 +379,11 @@ final class Ui {
 
         LinearLayout buttons = new LinearLayout(c);
         buttons.setOrientation(LinearLayout.HORIZONTAL);
+        buttons.setClipChildren(false);
+        buttons.setClipToPadding(false);
+        buttons.setPadding(dp(c, 12), dp(c, 12), dp(c, 12), dp(c, 12));
+        card.setClipChildren(false);
+        card.setClipToPadding(false);
         buttons.setGravity(Gravity.CENTER);
         TextView again = button(c, "Try again", true);
         again.setOnClickListener(retry);
@@ -349,7 +398,7 @@ final class Ui {
         buttons.addView(close, b2);
         LinearLayout.LayoutParams bwrap = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        bwrap.topMargin = dp(c, 28);
+        bwrap.topMargin = dp(c, 16);
         card.addView(buttons, bwrap);
 
         FrameLayout.LayoutParams clp = new FrameLayout.LayoutParams(
@@ -369,20 +418,50 @@ final class Ui {
         b.setClickable(true);
 
         float r = dp(c, 999);
-        GradientDrawable normal = rounded(primary ? RED : 0x1AFFFFFF, r);
-        GradientDrawable focused = rounded(primary ? RED_LIGHT : 0x33FFFFFF, r);
-        focused.setStroke(dp(c, 2), TEXT);
+        GradientDrawable normal = primary
+                ? new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[] { 0xFFF0213A, RED_DARK })
+                : new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[] { 0x26FFFFFF, 0x14FFFFFF });
+        normal.setCornerRadius(r);
+        normal.setStroke(dp(c, 1), primary ? 0x40FFFFFF : 0x1FFFFFFF);
+        GradientDrawable focused = primary
+                ? new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[] { 0xFFFF5A70, RED })
+                : new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[] { 0x4DFFFFFF, 0x26FFFFFF });
+        focused.setCornerRadius(r);
+        focused.setStroke(dp(c, 2), 0xE6FFFFFF);
         StateListDrawable states = new StateListDrawable();
         states.addState(new int[] { android.R.attr.state_focused }, focused);
         states.addState(new int[] {}, normal);
         Drawable bg = new RippleDrawable(ColorStateList.valueOf(0x33FFFFFF), states, null);
         b.setBackground(bg);
+        glow(b, primary ? 6 : 0);
 
+        // Focused: grows a little and the red glow slowly breathes.
+        final ValueAnimator pulse = ValueAnimator.ofFloat(dp(c, 10), dp(c, 22));
+        pulse.setDuration(1300);
+        pulse.setRepeatMode(ValueAnimator.REVERSE);
+        pulse.setRepeatCount(ValueAnimator.INFINITE);
+        pulse.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+            @Override
+            public void onAnimationUpdate(ValueAnimator a) {
+                b.setTranslationZ((Float) a.getAnimatedValue());
+            }
+        });
         b.setOnFocusChangeListener(new View.OnFocusChangeListener() {
             @Override
             public void onFocusChange(View v, boolean has) {
-                float s = has ? 1.06f : 1f;
-                v.animate().scaleX(s).scaleY(s).setDuration(150).start();
+                float s = has ? 1.07f : 1f;
+                v.animate().scaleX(s).scaleY(s).setDuration(180)
+                        .setInterpolator(new DecelerateInterpolator()).start();
+                if (has) {
+                    if (Build.VERSION.SDK_INT >= 28) {
+                        v.setOutlineAmbientShadowColor(RED);
+                        v.setOutlineSpotShadowColor(RED_LIGHT);
+                    }
+                    pulse.start();
+                } else {
+                    pulse.cancel();
+                    v.animate().translationZ(0).setDuration(180).start();
+                }
             }
         });
         return b;

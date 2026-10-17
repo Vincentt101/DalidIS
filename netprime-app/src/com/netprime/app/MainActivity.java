@@ -96,7 +96,7 @@ public class MainActivity extends Activity {
 
         progress = new Ui.TopProgress(this);
         FrameLayout.LayoutParams plp = new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(3));
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(16));
         plp.gravity = Gravity.TOP;
         root.addView(progress, plp);
 
@@ -122,7 +122,7 @@ public class MainActivity extends Activity {
         FrameLayout.LayoutParams hlp = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         hlp.gravity = Gravity.BOTTOM;
-        hlp.bottomMargin = dp(40);
+        hlp.bottomMargin = dp(28);
         root.addView(hint, hlp);
 
         if (savedInstanceState == null) {

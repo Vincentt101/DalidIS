@@ -4,19 +4,37 @@ if (!window.__tvnav) (function () {
   var SEL = 'a[href],button,input:not([type=hidden]),select,textarea,summary,video,iframe,' +
     '[role=button],[role=link],[role=tab],[role=menuitem],[role=option],[onclick],' +
     '[tabindex]:not([tabindex="-1"])';
-  var CLS = '__tvf', SEEN = '__tvi';
+  var CLS = '__tvf', SEEN = '__tvi', PILL = '__tvp';
   var cur = null, last = null;
   var rowMemory = new WeakMap(); // row -> last selected item in it (like Netflix)
 
-  // Netflix-style focus: the selected item grows a little, gets a white border and a shadow.
+  // Premium focus look.
+  //  - Menu items, small buttons and text links get a glowing red pill.
+  //  - Posters and cards get a white ring with a soft red glow that slowly breathes.
+  // Only transform is transitioned (GPU); the glow animation repaints just the one item.
+  var RING = '0 0 0 3px rgba(255,255,255,.95)';
+  var GLOW_A = '0 0 22px 4px rgba(229,9,20,.55),0 0 48px 10px rgba(229,9,20,.22)';
+  var GLOW_B = '0 0 30px 7px rgba(255,61,87,.75),0 0 64px 16px rgba(229,9,20,.32)';
+  var DROP = '0 18px 40px rgba(0,0,0,.65)';
   var css = document.createElement('style');
   css.textContent =
-    // Only transform is animated: the GPU handles it without repainting the page.
-    '.' + SEEN + '{transition:transform .22s cubic-bezier(.2,.8,.2,1)!important;' +
+    '.' + SEEN + '{transition:transform .24s cubic-bezier(.2,.8,.2,1)!important;' +
     'backface-visibility:hidden}' +
-    '.' + CLS + '{outline:3px solid #fff!important;outline-offset:3px!important;' +
-    'border-radius:6px;transform:scale(1.08) translateZ(0)!important;z-index:10!important;' +
-    'will-change:transform;box-shadow:0 10px 28px rgba(0,0,0,.75)!important}' +
+    '.' + CLS + '{outline:none!important;border-radius:12px!important;' +
+    'transform:scale(1.08) translateZ(0)!important;z-index:10!important;will-change:transform;' +
+    'box-shadow:' + RING + ',' + GLOW_A + ',' + DROP + '!important;' +
+    'animation:__tvglow 2.6s ease-in-out infinite!important}' +
+    '@keyframes __tvglow{0%,100%{box-shadow:' + RING + ',' + GLOW_A + ',' + DROP + '}' +
+    '50%{box-shadow:' + RING + ',' + GLOW_B + ',' + DROP + '}}' +
+    // pill version: solid red gradient pill with a soft glow (extra 7px of pill from the spread shadow)
+    '.' + CLS + '.' + PILL + '{border-radius:999px!important;transform:scale(1.06) translateZ(0)!important;' +
+    'background:linear-gradient(180deg,#FF3D57,#D10A1A)!important;color:#fff!important;' +
+    'text-decoration:none!important;' +
+    'box-shadow:0 0 0 7px #E0142A,0 0 0 8px rgba(255,255,255,.35),' + GLOW_A + '!important;' +
+    'animation:__tvpill 2.6s ease-in-out infinite!important}' +
+    '.' + CLS + '.' + PILL + ' *{color:#fff!important}' +
+    '@keyframes __tvpill{0%,100%{box-shadow:0 0 0 7px #E0142A,0 0 0 8px rgba(255,255,255,.35),' + GLOW_A + '}' +
+    '50%{box-shadow:0 0 0 7px #E81A30,0 0 0 8px rgba(255,255,255,.5),' + GLOW_B + '}}' +
     'iframe.' + CLS + ',video.' + CLS + '{transform:none!important}' +
     'html{scroll-behavior:smooth}';
   (document.head || document.documentElement).appendChild(css);
@@ -74,10 +92,21 @@ if (!window.__tvnav) (function () {
     return null;
   }
 
+  // Small text items (menu links, buttons) get the pill look; posters/cards get the ring.
+  function isPill(el) {
+    var r = el.getBoundingClientRect();
+    if (r.height > 72 || r.width > 420) return false;
+    if (el.tagName === 'IMG' || el.tagName === 'VIDEO' || el.tagName === 'IFRAME') return false;
+    var img = el.querySelector && el.querySelector('img,video,picture,svg[width]');
+    if (img && img.getBoundingClientRect().height > 40) return false;
+    return true;
+  }
+
   function select(el, dir) {
     if (cur && cur !== el) cur.classList.remove(CLS);
     cur = el;
     el.classList.add(SEEN);
+    if (isPill(el)) el.classList.add(PILL);
     el.classList.add(CLS);
     var row = rowOf(el);
     if (row) rowMemory.set(row, el);

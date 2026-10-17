@@ -3,6 +3,8 @@ package com.netprime.app;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Paint;
+import android.graphics.RadialGradient;
+import android.graphics.Shader;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
@@ -43,7 +45,7 @@ class CursorLayout extends FrameLayout {
         super(context);
         density = getResources().getDisplayMetrics().density;
         pointer = new Pointer(context);
-        int size = Math.round(28 * density);
+        int size = Math.round(52 * density);
         half = size / 2;
         pointer.setVisibility(GONE);
         addView(pointer, new LayoutParams(size, size));
@@ -247,6 +249,7 @@ class CursorLayout extends FrameLayout {
         private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint ring = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint dot = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint halo = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final float d;
 
         Pointer(Context c) {
@@ -266,6 +269,10 @@ class CursorLayout extends FrameLayout {
         @Override
         protected void onDraw(Canvas c) {
             float cx = getWidth() / 2f, cy = getHeight() / 2f, r = 10 * d;
+            float gr = getWidth() / 2f;
+            halo.setShader(new RadialGradient(cx, cy, gr, new int[] { 0x80FF3D57, 0x40E50914, 0x00E50914 },
+                    new float[] { 0.3f, 0.6f, 1f }, Shader.TileMode.CLAMP));
+            c.drawCircle(cx, cy, gr, halo);
             c.drawCircle(cx, cy + 1.5f * d, r + 2.5f * d, shadow);
             c.drawCircle(cx, cy, r, fill);
             c.drawCircle(cx, cy, r, ring);
