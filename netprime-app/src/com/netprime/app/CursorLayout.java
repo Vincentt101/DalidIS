@@ -12,8 +12,9 @@ import android.view.View;
 import android.widget.FrameLayout;
 
 /**
- * On TV, shows a mouse-style pointer that the remote's arrow keys move.
- * OK/Enter clicks where the pointer is. Pushing against the top or bottom edge scrolls the page.
+ * Root view of the app. Can deliver taps anywhere on screen, and on TV can show a
+ * mouse-style pointer (pointer mode) that the remote's arrow keys move.
+ * Pushing the pointer against an edge scrolls the page. OK is handled by MainActivity.
  */
 class CursorLayout extends FrameLayout {
 
@@ -32,7 +33,6 @@ class CursorLayout extends FrameLayout {
     private int dx, dy;           // current direction from held arrow keys
     private float speed;
     private long lastActivity;
-    private long downTime;
     private View scrollTarget;
 
     CursorLayout(Context context) {
@@ -45,12 +45,44 @@ class CursorLayout extends FrameLayout {
         ring.setStrokeWidth(2.5f * density);
     }
 
-    void setCursorEnabled(boolean on) {
+    void setPointerMode(boolean on) {
         enabled = on;
         visible = on;
+        dx = dy = 0;
+        speed = 0;
         lastActivity = SystemClock.uptimeMillis();
         invalidate();
+        handler.removeCallbacks(hideCheck);
         if (on) handler.postDelayed(hideCheck, HIDE_AFTER_MS);
+    }
+
+    boolean isPointerMode() {
+        return enabled;
+    }
+
+    /** Taps at the pointer. */
+    void tapAtPointer() {
+        wake();
+        tap(x, y);
+    }
+
+    /** Taps at a screen position inside this view, like a finger would. */
+    void tap(final float tx, final float ty) {
+        final long down = SystemClock.uptimeMillis();
+        touch(down, down, MotionEvent.ACTION_DOWN, tx, ty);
+        handler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                touch(down, SystemClock.uptimeMillis(), MotionEvent.ACTION_UP, tx, ty);
+            }
+        }, 60);
+    }
+
+    private void touch(long downAt, long now, int action, float tx, float ty) {
+        MotionEvent ev = MotionEvent.obtain(downAt, now, action, tx, ty, 0);
+        ev.setSource(android.view.InputDevice.SOURCE_TOUCHSCREEN);
+        dispatchTouchEvent(ev);
+        ev.recycle();
     }
 
     void setScrollTarget(View v) {
@@ -82,17 +114,6 @@ class CursorLayout extends FrameLayout {
             case KeyEvent.KEYCODE_DPAD_UP:
             case KeyEvent.KEYCODE_DPAD_DOWN:
                 onArrow(code, down, event.getRepeatCount());
-                return true;
-            case KeyEvent.KEYCODE_DPAD_CENTER:
-            case KeyEvent.KEYCODE_ENTER:
-            case KeyEvent.KEYCODE_NUMPAD_ENTER:
-                if (down && event.getRepeatCount() == 0) {
-                    wake();
-                    downTime = SystemClock.uptimeMillis();
-                    sendTouch(MotionEvent.ACTION_DOWN);
-                } else if (!down) {
-                    sendTouch(MotionEvent.ACTION_UP);
-                }
                 return true;
             default:
                 return super.dispatchKeyEvent(event);
@@ -171,15 +192,6 @@ class CursorLayout extends FrameLayout {
         }
         handler.removeCallbacks(hideCheck);
         handler.postDelayed(hideCheck, HIDE_AFTER_MS);
-    }
-
-    private void sendTouch(int action) {
-        long now = SystemClock.uptimeMillis();
-        MotionEvent ev = MotionEvent.obtain(action == MotionEvent.ACTION_DOWN ? now : downTime,
-                now, action, x, y, 0);
-        ev.setSource(android.view.InputDevice.SOURCE_TOUCHSCREEN);
-        super.dispatchTouchEvent(ev);
-        ev.recycle();
     }
 
     @Override

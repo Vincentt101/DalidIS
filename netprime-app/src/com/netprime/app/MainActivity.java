@@ -9,12 +9,15 @@ import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.webkit.CookieManager;
+import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
@@ -27,6 +30,12 @@ import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
+import android.widget.Toast;
+
+import org.json.JSONObject;
+
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 
 public class MainActivity extends Activity {
 
@@ -42,6 +51,19 @@ public class MainActivity extends Activity {
     private View fullscreenView;
     private WebChromeClient.CustomViewCallback fullscreenCallback;
 
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    private boolean tv;
+    private String navJs = "";
+    private boolean okHeld;
+    private boolean okLongPressed;
+    private final Runnable okLongPress = new Runnable() {
+        @Override
+        public void run() {
+            okLongPressed = true;
+            togglePointerMode();
+        }
+    };
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -52,7 +74,9 @@ public class MainActivity extends Activity {
 
         root = new CursorLayout(this);
         root.setBackgroundColor(Color.BLACK);
-        root.setCursorEnabled(isTv());
+        tv = isTv();
+        navJs = readAsset("tvnav.js");
+        root.setPointerMode(false);
 
         webView = new WebView(this);
         setupWebView();
@@ -78,6 +102,24 @@ public class MainActivity extends Activity {
             webView.restoreState(savedInstanceState);
         } else {
             webView.loadUrl(HOME_URL);
+        }
+        if (tv) {
+            Toast.makeText(this, "Arrows: move   OK: open   Hold OK: pointer mode",
+                    Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private String readAsset(String name) {
+        try {
+            InputStream in = getAssets().open(name);
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+            in.close();
+            return out.toString("UTF-8");
+        } catch (Exception e) {
+            return "";
         }
     }
 
@@ -147,6 +189,11 @@ public class MainActivity extends Activity {
         @Override
         public void onPageStarted(WebView view, String url, Bitmap favicon) {
             errorView.setVisibility(View.GONE);
+        }
+
+        @Override
+        public void onPageFinished(WebView view, String url) {
+            if (tv) view.evaluateJavascript(navJs, null);
         }
 
         @Override
@@ -224,6 +271,7 @@ public class MainActivity extends Activity {
 
         Button retry = new Button(this);
         retry.setText("Try again");
+        retry.setFocusable(true);
         retry.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -238,23 +286,134 @@ public class MainActivity extends Activity {
         return box;
     }
 
+    // ---- TV remote ----
+
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
         int code = event.getKeyCode();
-        if (event.getAction() == KeyEvent.ACTION_DOWN) {
-            if (code == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE || code == KeyEvent.KEYCODE_MEDIA_PLAY
-                    || code == KeyEvent.KEYCODE_MEDIA_PAUSE) {
-                toggleVideo();
-                return true;
-            }
+        boolean down = event.getAction() == KeyEvent.ACTION_DOWN;
+
+        if (code == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE || code == KeyEvent.KEYCODE_MEDIA_PLAY
+                || code == KeyEvent.KEYCODE_MEDIA_PAUSE) {
+            if (down && event.getRepeatCount() == 0) playPause();
+            return true;
         }
-        return super.dispatchKeyEvent(event);
+        if (!tv || errorView.getVisibility() == View.VISIBLE) return super.dispatchKeyEvent(event);
+
+        if (isOk(code)) {
+            if (down) {
+                if (event.getRepeatCount() == 0) {
+                    okHeld = true;
+                    okLongPressed = false;
+                    handler.postDelayed(okLongPress, 700);
+                }
+            } else if (okHeld) {
+                okHeld = false;
+                handler.removeCallbacks(okLongPress);
+                if (!okLongPressed) click();
+            }
+            return true;
+        }
+
+        // Pointer mode: the root view moves the pointer.
+        if (root.isPointerMode()) return super.dispatchKeyEvent(event);
+
+        String dir = direction(code);
+        if (dir == null) return super.dispatchKeyEvent(event);
+
+        if (fullscreenView != null) {
+            // Fullscreen video: left/right seek, up/down go to the player.
+            if (down && (code == KeyEvent.KEYCODE_DPAD_LEFT || code == KeyEvent.KEYCODE_DPAD_RIGHT)) {
+                final int keyCode = code;
+                js("__tvnav.seek(" + (code == KeyEvent.KEYCODE_DPAD_LEFT ? -10 : 10) + ")",
+                        new ValueCallback<String>() {
+                            @Override
+                            public void onReceiveValue(String handled) {
+                                if (!"true".equals(handled)) sendKeyToPage(keyCode);
+                            }
+                        });
+            } else if (down) {
+                sendKeyToPage(code);
+            }
+            return true;
+        }
+
+        if (down) js("__tvnav.move('" + dir + "')", null);
+        return true;
     }
 
-    private void toggleVideo() {
-        webView.evaluateJavascript(
-                "(function(){var v=document.querySelector('video');"
-                        + "if(v){if(v.paused){v.play();}else{v.pause();}}})();", null);
+    private static boolean isOk(int code) {
+        return code == KeyEvent.KEYCODE_DPAD_CENTER || code == KeyEvent.KEYCODE_ENTER
+                || code == KeyEvent.KEYCODE_NUMPAD_ENTER;
+    }
+
+    private static String direction(int code) {
+        switch (code) {
+            case KeyEvent.KEYCODE_DPAD_UP: return "up";
+            case KeyEvent.KEYCODE_DPAD_DOWN: return "down";
+            case KeyEvent.KEYCODE_DPAD_LEFT: return "left";
+            case KeyEvent.KEYCODE_DPAD_RIGHT: return "right";
+            default: return null;
+        }
+    }
+
+    /** OK button: open the highlighted item (or tap under the pointer). */
+    private void click() {
+        if (root.isPointerMode()) {
+            root.tapAtPointer();
+        } else if (fullscreenView != null) {
+            root.tap(root.getWidth() / 2f, root.getHeight() / 2f);
+        } else {
+            js("__tvnav.target()", new ValueCallback<String>() {
+                @Override
+                public void onReceiveValue(String value) {
+                    tapTarget(value);
+                }
+            });
+        }
+    }
+
+    private void tapTarget(String json) {
+        if (json == null || "null".equals(json)) {
+            js("__tvnav.move('down')", null); // nothing selected yet: select something first
+            return;
+        }
+        try {
+            JSONObject o = new JSONObject(json);
+            float x = webView.getLeft() + (float) o.getDouble("fx") * webView.getWidth();
+            float y = webView.getTop() + (float) o.getDouble("fy") * webView.getHeight();
+            root.tap(x, y);
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void togglePointerMode() {
+        boolean pointer = !root.isPointerMode();
+        root.setPointerMode(pointer);
+        if (pointer) js("__tvnav.clear()", null);
+        Toast.makeText(this, pointer ? "Pointer mode (hold OK to switch back)"
+                : "Remote mode", Toast.LENGTH_SHORT).show();
+    }
+
+    private void playPause() {
+        js("__tvnav.playPause()", new ValueCallback<String>() {
+            @Override
+            public void onReceiveValue(String handled) {
+                // Video inside an embedded player: tapping the middle usually toggles it.
+                if (!"true".equals(handled) && fullscreenView != null) {
+                    root.tap(root.getWidth() / 2f, root.getHeight() / 2f);
+                }
+            }
+        });
+    }
+
+    private void sendKeyToPage(int code) {
+        webView.dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, code));
+        webView.dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_UP, code));
+    }
+
+    private void js(String call, ValueCallback<String> callback) {
+        webView.evaluateJavascript(navJs + "\n" + call, callback);
     }
 
     @Override
