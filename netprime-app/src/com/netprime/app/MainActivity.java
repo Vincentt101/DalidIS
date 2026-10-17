@@ -8,7 +8,9 @@ import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.SystemClock;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.Gravity;
@@ -58,6 +60,7 @@ public class MainActivity extends Activity {
     private boolean tv;
     private String navJs = "";
     private boolean okHeld;
+    private long lastMove;
     private boolean okLongPressed;
     private final Runnable okLongPress = new Runnable() {
         @Override
@@ -150,7 +153,9 @@ public class MainActivity extends Activity {
 
     private void showError() {
         dismissSplash();
+        errorView.setAlpha(0f);
         errorView.setVisibility(View.VISIBLE);
+        errorView.animate().alpha(1f).setDuration(250).start();
         retryButton.requestFocus();
     }
 
@@ -197,6 +202,13 @@ public class MainActivity extends Activity {
         s.setJavaScriptCanOpenWindowsAutomatically(false);
         s.setSupportMultipleWindows(false);
         s.setMixedContentMode(WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
+        // Smoother scrolling: draw the parts of the page just off screen ahead of time,
+        // and give the page renderer high priority.
+        if (Build.VERSION.SDK_INT >= 23) s.setOffscreenPreRaster(true);
+        if (Build.VERSION.SDK_INT >= 26) {
+            webView.setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, true);
+        }
+        webView.setOverScrollMode(View.OVER_SCROLL_NEVER);
 
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true);
@@ -275,6 +287,8 @@ public class MainActivity extends Activity {
             // Add below the cursor (the cursor is drawn on top of all children).
             root.addView(view, 1, new FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+            view.setAlpha(0f);
+            view.animate().alpha(1f).setDuration(220).start();
             webView.setVisibility(View.GONE);
             hideSystemBars();
         }
@@ -289,7 +303,9 @@ public class MainActivity extends Activity {
         if (fullscreenView == null) return;
         root.removeView(fullscreenView);
         fullscreenView = null;
+        webView.setAlpha(0f);
         webView.setVisibility(View.VISIBLE);
+        webView.animate().alpha(1f).setDuration(220).start();
         if (fullscreenCallback != null) fullscreenCallback.onCustomViewHidden();
         fullscreenCallback = null;
     }
@@ -363,7 +379,13 @@ public class MainActivity extends Activity {
             return true;
         }
 
-        if (down) js("__tvnav.move('" + dir + "')", null);
+        if (down) {
+            // Holding an arrow moves at a steady pace instead of as fast as the remote repeats.
+            long now = SystemClock.uptimeMillis();
+            if (event.getRepeatCount() > 0 && now - lastMove < 150) return true;
+            lastMove = now;
+            js("__tvnav.move('" + dir + "')", null);
+        }
         return true;
     }
 
@@ -436,8 +458,19 @@ public class MainActivity extends Activity {
         webView.dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_UP, code));
     }
 
-    private void js(String call, ValueCallback<String> callback) {
-        webView.evaluateJavascript(navJs + "\n" + call, callback);
+    /** Runs a navigation call; the full script is only sent when the page doesn't have it yet. */
+    private void js(final String call, final ValueCallback<String> callback) {
+        webView.evaluateJavascript("window.__tvnav?(" + call + "):'__missing'",
+                new ValueCallback<String>() {
+                    @Override
+                    public void onReceiveValue(String v) {
+                        if ("\"__missing\"".equals(v)) {
+                            webView.evaluateJavascript(navJs + "\n" + call, callback);
+                        } else if (callback != null) {
+                            callback.onReceiveValue(v);
+                        }
+                    }
+                });
     }
 
     @Override

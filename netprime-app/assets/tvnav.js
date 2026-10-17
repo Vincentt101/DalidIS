@@ -11,10 +11,12 @@ if (!window.__tvnav) (function () {
   // Netflix-style focus: the selected item grows a little, gets a white border and a shadow.
   var css = document.createElement('style');
   css.textContent =
-    '.' + SEEN + '{transition:transform .18s ease-out,box-shadow .18s ease-out!important}' +
+    // Only transform is animated: the GPU handles it without repainting the page.
+    '.' + SEEN + '{transition:transform .22s cubic-bezier(.2,.8,.2,1)!important;' +
+    'backface-visibility:hidden}' +
     '.' + CLS + '{outline:3px solid #fff!important;outline-offset:3px!important;' +
-    'border-radius:6px;transform:scale(1.08)!important;z-index:10!important;' +
-    'box-shadow:0 10px 28px rgba(0,0,0,.75)!important}' +
+    'border-radius:6px;transform:scale(1.08) translateZ(0)!important;z-index:10!important;' +
+    'will-change:transform;box-shadow:0 10px 28px rgba(0,0,0,.75)!important}' +
     'iframe.' + CLS + ',video.' + CLS + '{transform:none!important}' +
     'html{scroll-behavior:smooth}';
   (document.head || document.documentElement).appendChild(css);
@@ -39,6 +41,8 @@ if (!window.__tvnav) (function () {
       var el = all[i];
       if (el.disabled) continue;
       var r = el.getBoundingClientRect();
+      // Skip things far off screen before the (slower) style check.
+      if (el !== cur && (r.bottom < -v.h * 2 || r.top > v.h * 3)) continue;
       if (!shown(el, r)) continue;
       var media = el.tagName === 'IFRAME' || el.tagName === 'VIDEO';
       if (!media && r.width * r.height > big) continue; // page-wide wrappers

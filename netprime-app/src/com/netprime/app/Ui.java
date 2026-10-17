@@ -233,7 +233,7 @@ final class Ui {
         void setProgress(int percent) {
             float target = percent / 100f;
             if (anim != null) anim.cancel();
-            if (percent < 100 && getAlpha() < 1f) animate().alpha(1f).setDuration(150).start();
+            if (percent < 100) animate().alpha(1f).setStartDelay(0).setDuration(150).start();
             if (target < shown) shown = 0;
             anim = ValueAnimator.ofFloat(shown, target);
             anim.setDuration(250);
