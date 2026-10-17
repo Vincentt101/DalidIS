@@ -5,7 +5,8 @@ Opens https://netprime.bz/ full screen.
 - Shows up on the Google TV home screen (banner + TV launcher entry).
 - Blocks ads: requests to ~73k known ad/tracking servers are refused (StevenBlack/hosts list),
   pop-up windows are blocked, and links that leave netprime.bz are ignored.
-- On TV, the remote's arrow keys move a red highlight between links and buttons; OK opens
+- On TV, Netflix-style navigation: arrows move between items (selected one grows with a white
+  border, rows keep it near the left, each row remembers your place); OK opens
   the highlighted item. Hold OK to switch to pointer mode (a dot you move around) for spots
   the highlight can't reach; hold OK again to switch back. In fullscreen video, left/right
   skip 10 seconds. Play/Pause on the remote toggles the video.

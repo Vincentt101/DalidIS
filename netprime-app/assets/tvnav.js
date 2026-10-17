@@ -4,14 +4,19 @@ if (!window.__tvnav) (function () {
   var SEL = 'a[href],button,input:not([type=hidden]),select,textarea,summary,video,iframe,' +
     '[role=button],[role=link],[role=tab],[role=menuitem],[role=option],[onclick],' +
     '[tabindex]:not([tabindex="-1"])';
-  var CLS = '__tvf';
+  var CLS = '__tvf', SEEN = '__tvi';
   var cur = null, last = null;
+  var rowMemory = new WeakMap(); // row -> last selected item in it (like Netflix)
 
+  // Netflix-style focus: the selected item grows a little, gets a white border and a shadow.
   var css = document.createElement('style');
-  css.textContent = '.' + CLS + '{outline:4px solid #e50914!important;outline-offset:2px!important;' +
-    'box-shadow:0 0 0 7px rgba(229,9,20,.35)!important;transform:scale(1.04);' +
-    'transition:transform .12s}' +
-    'iframe.' + CLS + ',video.' + CLS + '{transform:none}';
+  css.textContent =
+    '.' + SEEN + '{transition:transform .18s ease-out,box-shadow .18s ease-out!important}' +
+    '.' + CLS + '{outline:3px solid #fff!important;outline-offset:3px!important;' +
+    'border-radius:6px;transform:scale(1.08)!important;z-index:10!important;' +
+    'box-shadow:0 10px 28px rgba(0,0,0,.75)!important}' +
+    'iframe.' + CLS + ',video.' + CLS + '{transform:none!important}' +
+    'html{scroll-behavior:smooth}';
   (document.head || document.documentElement).appendChild(css);
 
   function vp() {
@@ -54,15 +59,45 @@ if (!window.__tvnav) (function () {
     return r.bottom > 0 && r.right > 0 && r.top < v.h && r.left < v.w;
   }
 
-  function select(el) {
+  // The nearest sideways-scrolling row that contains el (a row of movie posters).
+  function rowOf(el) {
+    for (var p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+      if (p.scrollWidth > p.clientWidth + 4) {
+        var o = getComputedStyle(p).overflowX;
+        if (o === 'auto' || o === 'scroll' || o === 'hidden') return p;
+      }
+    }
+    return null;
+  }
+
+  function select(el, dir) {
     if (cur && cur !== el) cur.classList.remove(CLS);
     cur = el;
+    el.classList.add(SEEN);
     el.classList.add(CLS);
-    var r = el.getBoundingClientRect(), v = vp();
-    if (r.top < 40 || r.bottom > v.h - 40 || r.left < 0 || r.right > v.w) {
-      el.scrollIntoView({ block: 'center', inline: 'center', behavior: 'smooth' });
+    var row = rowOf(el);
+    if (row) rowMemory.set(row, el);
+
+    var v = vp(), r = el.getBoundingClientRect();
+    // Sideways: keep the selection near the left edge of its row.
+    if (row) {
+      var rr = row.getBoundingClientRect();
+      var left = r.left - rr.left;
+      if (dir === 'left' || dir === 'right' || left < 0 || r.right > rr.right) {
+        row.scrollBy({ left: left - 48, behavior: 'smooth' });
+      }
+    } else if (r.left < 0 || r.right > v.w) {
+      el.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
     }
-    last = center(el.getBoundingClientRect());
+    // Up/down: keep the selected row at the same spot, about a third down the screen.
+    var vertical = dir === 'up' || dir === 'down';
+    if (vertical || r.top < 0 || r.bottom > v.h) {
+      var target = Math.min(v.h * 0.3, Math.max(v.h - r.height - 24, 24));
+      var dy = r.top - target;
+      if (!vertical) dy = r.top < 0 ? r.top - 24 : r.bottom - v.h + 24;
+      if (Math.abs(dy) > 4) window.scrollBy({ top: dy, behavior: 'smooth' });
+    }
+    last = center(r);
   }
 
   function pickStart(list) {
@@ -93,15 +128,21 @@ if (!window.__tvnav) (function () {
       if (dir === 'left')  { primary = a.left - b.right;  if (bc.x >= ac.x - 2) return; }
       if (dir === 'up' || dir === 'down') {
         overlap = Math.min(a.right, b.right) - Math.max(a.left, b.left);
-        side = overlap > 0 ? 0 : Math.abs(bc.x - ac.x);
+        side = Math.abs(bc.x - ac.x) * (overlap > 0 ? 0.5 : 2);
       } else {
         overlap = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
-        side = overlap > 0 ? 0 : Math.abs(bc.y - ac.y);
+        side = Math.abs(bc.y - ac.y) * (overlap > 0 ? 0.5 : 2);
       }
-      var score = Math.max(primary, 0) + side * 2;
+      var score = Math.max(primary, 0) + side;
       if (score < bs) { bs = score; best = o.el; }
     });
-    if (best) { select(best); return 'moved'; }
+    if (best && (dir === 'up' || dir === 'down')) {
+      // Entering another row: go back to where you were in that row.
+      var row = rowOf(best), mem = row && rowMemory.get(row);
+      if (mem && mem.isConnected && row !== rowOf(cur) &&
+          list.some(function (o) { return o.el === mem; })) best = mem;
+    }
+    if (best) { select(best, dir); return 'moved'; }
     scrollPage(dir);
     return 'scroll';
   }
