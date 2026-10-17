@@ -52,24 +52,92 @@ if (!window.__tvnav) (function () {
            s.pointerEvents !== 'none';
   }
 
-  function items() {
-    var v = vp(), big = v.w * v.h * 0.6, out = [];
-    var all = document.querySelectorAll(SEL);
+  // ---- Finding selectable things ----
+  // 1. Real links/buttons (SEL).
+  // 2. Anything the site styles as clickable (cursor: pointer). Many movie sites build
+  //    poster cards as plain boxes with click handlers, not links.
+  // 3. Poster-sized images, as a last resort.
+  // The expensive part (2) is cached and only redone after the page changes.
+  var SKIP = { SCRIPT: 1, STYLE: 1, LINK: 1, META: 1, NOSCRIPT: 1, BR: 1, HTML: 1, BODY: 1,
+               HEAD: 1, TITLE: 1, path: 1, g: 1, use: 1, defs: 1, svg: 1, SOURCE: 1, TRACK: 1 };
+  var pointerCache = null, dirty = true, scannedAt = 0;
+  try {
+    new MutationObserver(function () { dirty = true; })
+      .observe(document.documentElement, { childList: true, subtree: true, attributes: true,
+                                           attributeFilter: ['class', 'style', 'hidden'] });
+  } catch (e) {}
+
+  // Clickable-looking elements: where the site's "pointer" cursor starts, plus
+  // repeated same-size boxes inside a clickable area (cards in a clickable row).
+  function pointerRoots() {
+    var now = Date.now();
+    if (pointerCache && (!dirty || now - scannedAt < 400)) return pointerCache;
+    var out = [], all = document.body ? document.body.getElementsByTagName('*') : [];
+    var isPtr = new Map();
+    function ptr(el) {
+      if (!el || el === document.body || el === document.documentElement) return false;
+      var v = isPtr.get(el);
+      if (v === undefined) { v = getComputedStyle(el).cursor === 'pointer'; isPtr.set(el, v); }
+      return v;
+    }
     for (var i = 0; i < all.length; i++) {
       var el = all[i];
-      if (el.disabled) continue;
+      if (SKIP[el.tagName] || !ptr(el)) continue;
+      if (!ptr(el.parentElement)) { out.push(el); continue; }
+      if (looksLikeListItem(el)) out.push(el);
+    }
+    pointerCache = out; dirty = false; scannedAt = now;
+    return out;
+  }
+
+  function looksLikeListItem(el) {
+    var p = el.parentElement;
+    if (!p || p.children.length < 2) return false;
+    // Layout size (ignores the zoom we add to the selected item).
+    var w = el.offsetWidth, h = el.offsetHeight;
+    if (!(w >= 60 && h >= 60)) return false;
+    for (var k = 0; k < p.children.length; k++) {
+      var sib = p.children[k];
+      if (sib === el) continue;
+      if (Math.abs(sib.offsetWidth - w) < 4 && Math.abs(sib.offsetHeight - h) < 4) return true;
+    }
+    return false;
+  }
+
+  function items() {
+    var v = vp(), big = v.w * v.h * 0.6, seen = new Set(), out = [];
+    function add(el, minW, minH) {
+      if (seen.has(el) || el.disabled) return;
+      seen.add(el);
       var r = el.getBoundingClientRect();
       // Skip things far off screen before the (slower) style check.
-      if (el !== cur && (r.bottom < -v.h * 2 || r.top > v.h * 3)) continue;
-      if (!shown(el, r)) continue;
+      if (el !== cur && (r.bottom < -v.h * 2 || r.top > v.h * 3)) return;
+      if (r.width < minW || r.height < minH || !shown(el, r)) return;
       var media = el.tagName === 'IFRAME' || el.tagName === 'VIDEO';
-      if (!media && r.width * r.height > big) continue; // page-wide wrappers
+      if (!media && r.width * r.height > big) return; // page-wide wrappers
       out.push({ el: el, r: r });
     }
-    // Keep only the outermost item (e.g. a movie card link, not the image inside it).
+    var i, a = document.querySelectorAll(SEL);
+    for (i = 0; i < a.length; i++) add(a[i], 6, 6);
+    a = pointerRoots();
+    for (i = 0; i < a.length; i++) add(a[i], 16, 16);
+    a = document.images;
+    for (i = 0; i < a.length; i++) add(a[i], 60, 60);
+
+    // Nested items: a card that holds one thing keeps the card (e.g. poster card, not
+    // its image); a box that holds several things is a group, so keep the things inside.
     var set = new Set(out.map(function (o) { return o.el; }));
+    var inner = new Map();
+    out.forEach(function (o) {
+      for (var p = o.el.parentElement; p; p = p.parentElement) {
+        if (set.has(p)) inner.set(p, (inner.get(p) || 0) + 1);
+      }
+    });
     return out.filter(function (o) {
-      for (var p = o.el.parentElement; p; p = p.parentElement) if (set.has(p)) return false;
+      if ((inner.get(o.el) || 0) >= 2) return false;          // group: drop it
+      for (var p = o.el.parentElement; p; p = p.parentElement) {
+        if (set.has(p) && (inner.get(p) || 0) < 2) return false; // inside a single card
+      }
       return true;
     });
   }
