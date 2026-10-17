@@ -13,7 +13,7 @@ get hosts.txt https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts
 
 # Assemble the app folder that apktool packs.
 P=build/pkg; rm -rf "$P" build/classes; mkdir -p "$P/assets" build/classes
-cp AndroidManifest.xml apktool.yml "$P/"; cp -r res "$P/"; cp assets/* "$P/assets/"
+cp AndroidManifest.xml apktool.yml "$P/"; cp -r res "$P/"; cp -r assets/. "$P/assets/"
 python3 tools/make_images.py "$P"
 python3 tools/make_blocklist.py "$T/hosts.txt" "$P/assets/adhosts.txt"
 

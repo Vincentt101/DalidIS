@@ -46,7 +46,10 @@ public class MainActivity extends Activity {
 
     private CursorLayout root;
     private WebView webView;
-    private ProgressBar progress;
+    private Ui.TopProgress progress;
+    private Ui.Splash splash;
+    private Ui.Hint hint;
+    private View retryButton;
     private View errorView;
     private View fullscreenView;
     private WebChromeClient.CustomViewCallback fullscreenCallback;
@@ -72,8 +75,12 @@ public class MainActivity extends Activity {
 
         AdBlock.load(this);
 
+        Ui.loadFonts(this);
+        getWindow().setStatusBarColor(Ui.BG);
+        getWindow().setNavigationBarColor(Ui.BG);
+
         root = new CursorLayout(this);
-        root.setBackgroundColor(Color.BLACK);
+        root.setBackgroundColor(Ui.BG);
         tv = isTv();
         navJs = readAsset("tvnav.js");
         root.setPointerMode(false);
@@ -84,17 +91,49 @@ public class MainActivity extends Activity {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         root.setScrollTarget(webView);
 
-        progress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
-        progress.setMax(100);
+        progress = new Ui.TopProgress(this);
         FrameLayout.LayoutParams plp = new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(4));
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(3));
         plp.gravity = Gravity.TOP;
         root.addView(progress, plp);
 
-        errorView = buildErrorView();
+        View[] first = new View[1];
+        errorView = Ui.errorScreen(this, new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                errorView.setVisibility(View.GONE);
+                webView.reload();
+            }
+        }, new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                finish();
+            }
+        }, first);
+        retryButton = first[0];
         errorView.setVisibility(View.GONE);
         root.addView(errorView, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
+        hint = new Ui.Hint(this);
+        FrameLayout.LayoutParams hlp = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        hlp.gravity = Gravity.BOTTOM;
+        hlp.bottomMargin = dp(40);
+        root.addView(hint, hlp);
+
+        if (savedInstanceState == null) {
+            splash = new Ui.Splash(this);
+            splash.setOnGone(new Runnable() {
+                @Override
+                public void run() {
+                    splash = null;
+                    if (tv) hint.show("Arrows  Move   \u00B7   OK  Open   \u00B7   Hold OK  Pointer", 6000);
+                }
+            });
+            root.addView(splash, new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        }
 
         setContentView(root);
 
@@ -103,11 +142,25 @@ public class MainActivity extends Activity {
         } else {
             webView.loadUrl(HOME_URL);
         }
-        if (tv) {
-            Toast.makeText(this, "Arrows: move   OK: open   Hold OK: pointer mode",
-                    Toast.LENGTH_LONG).show();
-        }
     }
+
+    private void dismissSplash() {
+        if (splash != null) splash.dismiss();
+    }
+
+    private void showError() {
+        dismissSplash();
+        errorView.setVisibility(View.VISIBLE);
+        retryButton.requestFocus();
+    }
+
+    // Small visual polish on the website itself: no scrollbars, no grey tap flash.
+    private static final String BASE_CSS =
+            "(function(){if(document.getElementById('__np_css'))return;"
+            + "var s=document.createElement('style');s.id='__np_css';"
+            + "s.textContent='::-webkit-scrollbar{width:0!important;height:0!important;"
+            + "background:transparent!important}*{-webkit-tap-highlight-color:transparent}';"
+            + "(document.head||document.documentElement).appendChild(s);})();";
 
     private String readAsset(String name) {
         try {
@@ -193,12 +246,14 @@ public class MainActivity extends Activity {
 
         @Override
         public void onPageFinished(WebView view, String url) {
+            view.evaluateJavascript(BASE_CSS, null);
             if (tv) view.evaluateJavascript(navJs, null);
+            dismissSplash();
         }
 
         @Override
         public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
-            if (request.isForMainFrame()) errorView.setVisibility(View.VISIBLE);
+            if (request.isForMainFrame()) showError();
         }
     }
 
@@ -206,7 +261,7 @@ public class MainActivity extends Activity {
         @Override
         public void onProgressChanged(WebView view, int p) {
             progress.setProgress(p);
-            progress.setVisibility(p >= 100 ? View.GONE : View.VISIBLE);
+            if (p >= 100) dismissSplash();
         }
 
         @Override
@@ -218,7 +273,7 @@ public class MainActivity extends Activity {
             fullscreenView = view;
             fullscreenCallback = callback;
             // Add below the cursor (the cursor is drawn on top of all children).
-            root.addView(view, new FrameLayout.LayoutParams(
+            root.addView(view, 1, new FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
             webView.setVisibility(View.GONE);
             hideSystemBars();
@@ -254,36 +309,6 @@ public class MainActivity extends Activity {
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
         if (hasFocus) hideSystemBars();
-    }
-
-    private View buildErrorView() {
-        LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.VERTICAL);
-        box.setGravity(Gravity.CENTER);
-        box.setBackgroundColor(Color.rgb(20, 20, 24));
-
-        TextView msg = new TextView(this);
-        msg.setText("Can't reach NetPrime.\nCheck the internet connection and try again.");
-        msg.setTextColor(Color.WHITE);
-        msg.setTextSize(20);
-        msg.setGravity(Gravity.CENTER);
-        box.addView(msg);
-
-        Button retry = new Button(this);
-        retry.setText("Try again");
-        retry.setFocusable(true);
-        retry.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                errorView.setVisibility(View.GONE);
-                webView.reload();
-            }
-        });
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        lp.topMargin = dp(24);
-        box.addView(retry, lp);
-        return box;
     }
 
     // ---- TV remote ----
@@ -391,8 +416,7 @@ public class MainActivity extends Activity {
         boolean pointer = !root.isPointerMode();
         root.setPointerMode(pointer);
         if (pointer) js("__tvnav.clear()", null);
-        Toast.makeText(this, pointer ? "Pointer mode (hold OK to switch back)"
-                : "Remote mode", Toast.LENGTH_SHORT).show();
+        hint.show(pointer ? "Pointer mode  \u00B7  Hold OK to switch back" : "Remote mode", 2500);
     }
 
     private void playPause() {

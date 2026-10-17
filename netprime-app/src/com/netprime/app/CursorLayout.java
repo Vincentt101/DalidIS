@@ -24,6 +24,8 @@ class CursorLayout extends FrameLayout {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint ring = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint shadow = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint dot = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final float density;
 
     private boolean enabled;
@@ -39,8 +41,10 @@ class CursorLayout extends FrameLayout {
         super(context);
         setWillNotDraw(false);
         density = getResources().getDisplayMetrics().density;
-        fill.setColor(0xFFFFFFFF);
-        ring.setColor(0xCC000000);
+        fill.setColor(0xF2FFFFFF);
+        ring.setColor(0xFFE50914);
+        shadow.setColor(0x59000000);
+        dot.setColor(0xFFE50914);
         ring.setStyle(Paint.Style.STROKE);
         ring.setStrokeWidth(2.5f * density);
     }
@@ -198,9 +202,11 @@ class CursorLayout extends FrameLayout {
     protected void dispatchDraw(Canvas canvas) {
         super.dispatchDraw(canvas);
         if (enabled && visible) {
-            float r = 9 * density;
+            float r = 10 * density;
+            canvas.drawCircle(x, y + 1.5f * density, r + 3 * density, shadow);
             canvas.drawCircle(x, y, r, fill);
             canvas.drawCircle(x, y, r, ring);
+            canvas.drawCircle(x, y, 3 * density, dot);
         }
     }
 

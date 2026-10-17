@@ -12,6 +12,9 @@ Opens https://netprime.bz/ full screen.
   skip 10 seconds. Play/Pause on the remote toggles the video.
 - Fullscreen video supported; Back leaves fullscreen, then goes back a page, then exits.
 
+- Modern dark UI: animated loading screen, error screen with remote-friendly buttons, hint pill,
+  thin red loading line, Inter font, adaptive icon and TV banner (drawn by tools/make_images.py).
+
 Build: `./build.sh` (needs Java 17+, Python 3 + Pillow, internet). Output: `../apk/NetPrime.apk`.
 Remote navigation lives in `assets/tvnav.js`.
 To allow another web address, add it to `ALLOWED_SITES` in `MainActivity.java`.
