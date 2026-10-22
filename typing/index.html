@@ -1,0 +1,717 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Typing Master</title>
+<meta name="description" content="A typing game: blast falling words and test your speed.">
+<meta name="theme-color" content="#0f0d24">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Typing Master">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="manifest" href="manifest.json">
+<style>
+  :root {
+    --bg: #0f0d24;
+    --bg2: #1a1640;
+    --panel: #221d52;
+    --line: #3a3380;
+    --text: #f4f3ff;
+    --muted: #a7a3d6;
+    --accent: #7c6cff;
+    --accent2: #ec4899;
+    --good: #34d399;
+    --bad: #f87171;
+    --gold: #fbbf24;
+    --app-h: 100vh;
+    --app-top: 0px;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Rounded", "Segoe UI", Roboto, sans-serif;
+    position: fixed; inset: 0; overflow: hidden; overscroll-behavior: none;
+    -webkit-user-select: none; user-select: none;
+  }
+  #app {
+    position: absolute; left: 0; right: 0; top: var(--app-top); height: var(--app-h);
+    display: flex; flex-direction: column;
+    padding: env(safe-area-inset-top) max(16px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left));
+    background: radial-gradient(120% 60% at 50% 0%, #2b2370 0%, var(--bg) 70%);
+  }
+  .screen { display: none; flex: 1; flex-direction: column; min-height: 0; }
+  .screen.active { display: flex; }
+  button { font: inherit; color: inherit; border: 0; cursor: pointer; }
+  .btn {
+    background: var(--accent); color: #fff; font-weight: 700; font-size: 18px;
+    padding: 16px 20px; border-radius: 16px; width: 100%;
+    box-shadow: 0 4px 0 #4b3fc4; transition: transform .08s;
+  }
+  .btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #4b3fc4; }
+  .btn.ghost { background: transparent; border: 2px solid var(--line); box-shadow: none; color: var(--muted); }
+  .btn.pink { background: var(--accent2); box-shadow: 0 4px 0 #a3196a; }
+  .btn.pink:active { box-shadow: 0 1px 0 #a3196a; }
+
+  /* ---------- Menu ---------- */
+  #menu { justify-content: flex-start; gap: 18px; padding-bottom: max(20px, env(safe-area-inset-bottom)); overflow-y: auto; }
+  #menu > :first-child, #results > :first-child { margin-top: auto; padding-top: 12px; }
+  #menu > :last-child, #results > :last-child { margin-bottom: auto; }
+  .logo { text-align: center; margin-bottom: 4px; }
+  .logo h1 { font-size: 40px; margin: 0; letter-spacing: -1px; line-height: 1; }
+  .logo h1 span { color: var(--accent2); }
+  .logo p { color: var(--muted); margin: 8px 0 0; }
+  .keys { display: flex; justify-content: center; gap: 6px; margin-bottom: 14px; }
+  .keys b {
+    width: 38px; height: 40px; border-radius: 9px; background: #fff; color: var(--accent);
+    display: grid; place-items: center; font-size: 20px; box-shadow: 0 4px 0 #1e1b4b;
+    animation: bob 1.6s ease-in-out infinite;
+  }
+  .keys b:nth-child(2) { animation-delay: .15s } .keys b:nth-child(3) { animation-delay: .3s }
+  .keys b:nth-child(4) { animation-delay: .45s } .keys b:nth-child(5) { animation-delay: .6s }
+  @keyframes bob { 50% { transform: translateY(-6px); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 16px; }
+  .card h2 { margin: 0 0 4px; font-size: 20px; }
+  .card p { margin: 0 0 12px; color: var(--muted); font-size: 14px; }
+  .seg { display: flex; background: var(--bg2); border-radius: 12px; padding: 4px; gap: 4px; margin-bottom: 12px; }
+  .seg button { flex: 1; padding: 9px 4px; border-radius: 9px; background: transparent; color: var(--muted); font-weight: 600; font-size: 14px; }
+  .seg button.on { background: var(--accent); color: #fff; }
+  .best { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); margin-top: 10px; }
+  .best b { color: var(--gold); }
+  .row { display: flex; gap: 10px; }
+  .small { font-size: 14px; padding: 10px; }
+
+  /* ---------- HUD ---------- */
+  .hud { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 0; }
+  .hud .pill { background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; font-weight: 700; font-size: 15px; white-space: nowrap; }
+  .hud .pill small { color: var(--muted); font-weight: 600; margin-right: 4px; }
+  .iconbtn { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; width: 40px; height: 36px; font-size: 16px; flex: none; }
+  .hearts { letter-spacing: 2px; font-size: 16px; }
+  @media (max-width: 380px) {
+    .hud { gap: 5px; }
+    .hud .pill { padding: 5px 8px; font-size: 13px; }
+    .hud .pill small { font-size: 10px; margin-right: 2px; }
+    .hearts { letter-spacing: 0; font-size: 13px; }
+    .iconbtn { width: 34px; }
+  }
+
+  /* ---------- Word Rain ---------- */
+  #arena {
+    position: relative; flex: 1; min-height: 0; overflow: hidden; border-radius: 20px;
+    background: linear-gradient(180deg, #17134a 0%, #100d2c 100%); border: 1px solid var(--line);
+  }
+  #arena::after { /* danger line */
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 4px;
+    background: linear-gradient(90deg, transparent, var(--bad), transparent); opacity: .7;
+  }
+  .word {
+    position: absolute; top: 0; left: 0; padding: 5px 10px; border-radius: 10px;
+    background: #fff; color: #1e1b4b; font-weight: 700; font-size: 18px; white-space: nowrap;
+    box-shadow: 0 3px 0 #1e1b4b; will-change: transform;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  .word .hit { color: var(--accent2); }
+  .word.target { outline: 3px solid var(--accent2); }
+  .word.danger { background: #ffe4e6; }
+  .word.special { background: var(--gold); }
+  .pop {
+    position: absolute; font-weight: 800; color: var(--gold); pointer-events: none; font-size: 18px;
+    animation: rise .8s ease-out forwards; text-shadow: 0 2px 0 #000;
+  }
+  @keyframes rise { to { transform: translateY(-50px); opacity: 0; } }
+  .burst { position: absolute; width: 8px; height: 8px; border-radius: 50%; pointer-events: none; animation: fly .6s ease-out forwards; }
+  @keyframes fly { to { transform: translate(var(--dx), var(--dy)) scale(.2); opacity: 0; } }
+  .banner {
+    position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none;
+    font-size: 36px; font-weight: 900; color: #fff; text-shadow: 0 4px 0 var(--accent);
+    animation: zoom 1.2s ease-out forwards;
+  }
+  @keyframes zoom { 0% { transform: scale(.5); opacity: 0 } 20% { transform: scale(1.1); opacity: 1 } 80% { opacity: 1 } 100% { transform: scale(1); opacity: 0 } }
+  .shake { animation: shake .3s; }
+  @keyframes shake { 25% { transform: translateX(-6px) } 75% { transform: translateX(6px) } }
+  .flash { animation: flash .4s; }
+  @keyframes flash { from { box-shadow: inset 0 0 0 999px rgba(248,113,113,.35); } }
+
+  /* ---------- Input bar ---------- */
+  .inputbar { padding: 10px 0 max(10px, env(safe-area-inset-bottom)); }
+  .typein {
+    width: 100%; font-size: 22px; font-weight: 700; padding: 12px 16px; border-radius: 14px;
+    border: 2px solid var(--accent); background: #fff; color: #1e1b4b; outline: none;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace; text-align: center;
+    -webkit-user-select: text; user-select: text;
+  }
+  .typein.wrong { border-color: var(--bad); background: #fff1f2; }
+  .hint { text-align: center; color: var(--muted); font-size: 12px; margin-top: 6px; }
+
+  /* ---------- Speed test ---------- */
+  #textbox {
+    position: relative; flex: 1; min-height: 0; overflow: hidden; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 20px; padding: 16px; font-size: 22px; line-height: 1.7;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace; color: var(--muted);
+  }
+  #textinner { transition: transform .2s; }
+  #textbox .w { display: inline-block; margin-right: .6em; border-radius: 6px; }
+  #textbox .w.cur { background: rgba(124,108,255,.25); color: var(--text); }
+  #textbox .w.ok { color: var(--good); }
+  #textbox .w.no { color: var(--bad); text-decoration: underline wavy var(--bad); }
+  #textbox .c.ok { color: var(--text); }
+  #textbox .c.no { color: var(--bad); background: rgba(248,113,113,.2); }
+  .timerbar { height: 6px; background: var(--bg2); border-radius: 99px; overflow: hidden; margin-bottom: 8px; }
+  .timerbar div { height: 100%; width: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); transition: width .25s linear; }
+
+  /* ---------- Results ---------- */
+  #results { justify-content: flex-start; gap: 16px; text-align: center; padding-bottom: max(20px, env(safe-area-inset-bottom)); overflow-y: auto; }
+  .stars { font-size: 44px; letter-spacing: 6px; }
+  .rank { font-size: 28px; font-weight: 900; margin: 0; }
+  .newbest { color: var(--gold); font-weight: 800; display: none; }
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 14px 8px; }
+  .stat b { display: block; font-size: 28px; }
+  .stat span { color: var(--muted); font-size: 13px; }
+
+  /* ---------- Pause overlay ---------- */
+  #pause {
+    position: absolute; inset: 0; background: rgba(15,13,36,.85); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    display: none; flex-direction: column; justify-content: center; gap: 14px; padding: 32px; z-index: 10;
+  }
+  #pause.show { display: flex; }
+  #pause h2 { text-align: center; font-size: 32px; margin: 0 0 10px; }
+
+  /* ---------- Install tip ---------- */
+  .tip { font-size: 13px; color: var(--muted); text-align: center; line-height: 1.5; }
+  .tip b { color: var(--text); }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- MENU -->
+  <section id="menu" class="screen active">
+    <div class="logo">
+      <div class="keys"><b>T</b><b>Y</b><b>P</b><b>E</b><b>!</b></div>
+      <h1>Typing <span>Master</span></h1>
+      <p>Train your fingers. Beat your best.</p>
+    </div>
+
+    <div class="card">
+      <h2>🌧️ Word Rain</h2>
+      <p>Words fall from the sky. Type them before they hit the ground!</p>
+      <div class="seg" id="diffSeg">
+        <button data-v="easy">Easy</button>
+        <button data-v="normal" class="on">Normal</button>
+        <button data-v="hard">Hard</button>
+      </div>
+      <button class="btn" id="playRain">Play</button>
+      <div class="best"><span>Best score</span><b id="bestRain">0</b></div>
+    </div>
+
+    <div class="card">
+      <h2>⚡ Speed Test</h2>
+      <p>How many words per minute can you type?</p>
+      <div class="seg" id="timeSeg">
+        <button data-v="15">15s</button>
+        <button data-v="30" class="on">30s</button>
+        <button data-v="60">60s</button>
+      </div>
+      <button class="btn pink" id="playSpeed">Start Test</button>
+      <div class="best"><span>Best speed</span><b id="bestSpeed">0 WPM</b></div>
+    </div>
+
+    <div class="row">
+      <button class="btn ghost small" id="soundBtn">🔊 Sound on</button>
+    </div>
+    <div class="tip" id="installTip">To install on iPhone: tap <b>Share</b> ⬆️ then <b>Add to Home Screen</b>.</div>
+  </section>
+
+  <!-- WORD RAIN -->
+  <section id="rain" class="screen">
+    <div class="hud">
+      <button class="iconbtn" id="rainPause" aria-label="Pause">⏸</button>
+      <div class="pill"><small>LV</small><span id="rLevel">1</span></div>
+      <div class="pill"><span id="rScore">0</span></div>
+      <div class="pill"><small>x</small><span id="rCombo">0</span></div>
+      <div class="pill hearts" id="rLives">❤️❤️❤️</div>
+    </div>
+    <div id="arena"></div>
+    <div class="inputbar">
+      <input id="rainInput" class="typein" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="go" placeholder="type here…">
+      <div class="hint">Tap the sky if the keyboard hides</div>
+    </div>
+  </section>
+
+  <!-- SPEED TEST -->
+  <section id="speed" class="screen">
+    <div class="hud">
+      <button class="iconbtn" id="speedQuit" aria-label="Quit">✕</button>
+      <div class="pill"><small>TIME</small><span id="sTime">30</span></div>
+      <div class="pill"><small>WPM</small><span id="sWpm">0</span></div>
+      <div class="pill"><small>ACC</small><span id="sAcc">100</span>%</div>
+    </div>
+    <div class="timerbar"><div id="sBar"></div></div>
+    <div id="textbox"><div id="textinner"></div></div>
+    <div class="inputbar">
+      <input id="speedInput" class="typein" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="next" placeholder="start typing…">
+      <div class="hint">Press space after each word. The clock starts when you type.</div>
+    </div>
+  </section>
+
+  <!-- RESULTS -->
+  <section id="results" class="screen">
+    <div class="stars" id="resStars">⭐⭐⭐</div>
+    <p class="rank" id="resRank">Typing Master</p>
+    <div class="newbest" id="resNew">🏆 New personal best!</div>
+    <div class="stats" id="resStats"></div>
+    <button class="btn" id="againBtn">Play again</button>
+    <button class="btn ghost" id="menuBtn">Menu</button>
+  </section>
+
+  <!-- PAUSE -->
+  <div id="pause">
+    <h2>Paused</h2>
+    <button class="btn" id="resumeBtn">Resume</button>
+    <button class="btn ghost" id="quitBtn">Quit to menu</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  // ---------- Word lists ----------
+  const SHORT = 'cat dog sun red run big hat cup box fox map pen top yes zip jam key log mud owl pig rat sky toy van web egg fan gum ice kid lip net pot sea tea win bus car day eye fun hot joy kit leg man new old pay sit ten use way art bag bed bee cow cry dry ear fly hug ink job lab mix nut oak pie raw saw tip wet yak zoo ant arm bat bow cap den dig elf fig gap hen hop jet kin lid mop nap oar pal rug sip tag urn vet wax yam'.split(' ');
+  const MEDIUM = 'apple brave chair dance eagle flame grape house jelly koala lemon magic night ocean piano queen river snake tiger unity voice whale young zebra beach cloud dream frost giant heart light money noise plant quick robot smile train water world bread candy dozen field globe honey juice knife laugh mango nurse orbit pearl quiet radio stone table under vivid wheat yield blaze crisp drift fable glide hover ivory jumbo karma lunar maple novel olive pixel quest roast spark tempo urban vapor witty mouse green pizza storm sweet chess flute cabin'.split(' ');
+  const LONG = 'keyboard elephant mountain sunshine butterfly computer adventure treasure chocolate dinosaur fantastic galaxy hurricane important jellyfish kangaroo lightning marathon notebook orchestra pineapple question rainbow strawberry telescope umbrella volcano waterfall xylophone yesterday zeppelin airplane basketball champion delicious everything fireworks grassland happiness invisible jackpot knowledge landscape microphone nightmare operation passenger quarterly remember spaceship together universe vacation wonderful whispering crocodile blueberry snowflake starlight sandcastle'.split(' ');
+  const SENTENCE_WORDS = 'the quick brown fox jumps over the lazy dog practice makes perfect every day you type a little faster keep your eyes on the screen and your fingers on the home row good typing is about rhythm not rushing take a deep breath and let the words flow the more you play the better you get accuracy first then speed will follow learning new skills is fun when it feels like a game stay calm and type on'.split(' ');
+  const COMMON = 'the be to of and a in that have it for not on with he as you do at this but his by from they we say her she or an will my one all would there their what so up out if about who get which go me when make can like time no just him know take people into year your good some could them see other than then now look only come its over think also back after use two how our work first well way even new want because any these give day most us great water long little very place right where world school still small home house light study learn night story place point plant fish hand play name city earth eyes'.split(' ');
+
+  const DIFF = {
+    easy:   { pools: [SHORT, SHORT, MEDIUM], speed: 28, spawn: 2600, max: 4 },
+    normal: { pools: [SHORT, MEDIUM, MEDIUM, LONG], speed: 38, spawn: 2100, max: 6 },
+    hard:   { pools: [MEDIUM, LONG, LONG], speed: 50, spawn: 1700, max: 8 },
+  };
+
+  const $ = (id) => document.getElementById(id);
+  const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+  // ---------- Storage (safe) ----------
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem('tm_' + k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+    set(k, v) { try { localStorage.setItem('tm_' + k, JSON.stringify(v)); } catch {} },
+  };
+
+  // ---------- Viewport (keeps game above the iOS keyboard) ----------
+  function fitViewport() {
+    const vv = window.visualViewport;
+    const h = vv ? vv.height : window.innerHeight;
+    const top = vv ? vv.offsetTop : 0;
+    document.documentElement.style.setProperty('--app-h', h + 'px');
+    document.documentElement.style.setProperty('--app-top', top + 'px');
+    window.scrollTo(0, 0);
+  }
+  if (window.visualViewport) {
+    visualViewport.addEventListener('resize', fitViewport);
+    visualViewport.addEventListener('scroll', fitViewport);
+  }
+  window.addEventListener('resize', fitViewport);
+  fitViewport();
+
+  // ---------- Sound ----------
+  let soundOn = store.get('sound', true);
+  let actx = null;
+  function unlockAudio() {
+    if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch {} }
+    if (actx && actx.state === 'suspended') actx.resume();
+  }
+  function beep(freq, dur = 0.08, type = 'sine', vol = 0.15, slide = 0) {
+    if (!soundOn || !actx) return;
+    const t = actx.currentTime;
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t);
+    if (slide) o.frequency.exponentialRampToValueAtTime(freq * slide, t + dur);
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    o.connect(g).connect(actx.destination); o.start(t); o.stop(t + dur);
+  }
+  const sfx = {
+    key: () => beep(900, 0.03, 'square', 0.04),
+    hit: (combo) => { beep(520 + Math.min(combo, 12) * 40, 0.12, 'triangle', 0.18, 1.5); },
+    miss: () => beep(160, 0.25, 'sawtooth', 0.12, 0.5),
+    wrong: () => beep(220, 0.08, 'square', 0.07),
+    level: () => { beep(523, 0.12, 'triangle'); setTimeout(() => beep(659, 0.12, 'triangle'), 110); setTimeout(() => beep(784, 0.2, 'triangle'), 220); },
+    over: () => { beep(392, 0.2, 'triangle'); setTimeout(() => beep(330, 0.2, 'triangle'), 180); setTimeout(() => beep(262, 0.4, 'triangle'), 360); },
+  };
+  function renderSound() { $('soundBtn').textContent = soundOn ? '🔊 Sound on' : '🔇 Sound off'; }
+  $('soundBtn').onclick = () => { soundOn = !soundOn; store.set('sound', soundOn); renderSound(); unlockAudio(); sfx.key(); };
+  renderSound();
+
+  // ---------- Screens ----------
+  let current = 'menu';
+  function show(id) {
+    document.querySelectorAll('.screen').forEach((s) => s.classList.toggle('active', s.id === id));
+    current = id;
+    if (id === 'menu') { renderBests(); document.activeElement && document.activeElement.blur(); }
+  }
+
+  function segment(el, key, def) {
+    let val = store.get(key, def);
+    const btns = el.querySelectorAll('button');
+    const paint = () => btns.forEach((b) => b.classList.toggle('on', b.dataset.v === String(val)));
+    btns.forEach((b) => b.onclick = () => { val = b.dataset.v; store.set(key, val); paint(); renderBests(); });
+    paint();
+    return () => val;
+  }
+  const getDiff = segment($('diffSeg'), 'diff', 'normal');
+  const getTime = segment($('timeSeg'), 'time', '30');
+
+  function renderBests() {
+    $('bestRain').textContent = store.get('bestRain_' + getDiff(), 0).toLocaleString();
+    $('bestSpeed').textContent = store.get('bestSpeed_' + getTime(), 0) + ' WPM';
+  }
+
+  // Hide install tip when already installed
+  if (window.navigator.standalone || matchMedia('(display-mode: standalone)').matches) $('installTip').style.display = 'none';
+
+  // =====================================================
+  //  WORD RAIN
+  // =====================================================
+  const arena = $('arena');
+  const rainInput = $('rainInput');
+  let R = null; // game state
+
+  function startRain() {
+    unlockAudio();
+    show('rain');
+    arena.innerHTML = '';
+    const d = DIFF[getDiff()];
+    R = {
+      diff: getDiff(), cfg: d, words: [], score: 0, combo: 0, bestCombo: 0, lives: 3,
+      level: 1, cleared: 0, typedChars: 0, wrongKeys: 0, spawnT: 0, last: 0, running: true,
+      paused: false, start: performance.now(), activeTime: 0,
+    };
+    rainInput.value = '';
+    rainInput.classList.remove('wrong');
+    rainInput.focus(); // must be inside the tap so iOS shows the keyboard
+    updateHud();
+    banner('Level 1');
+    spawnWord();
+    R.last = performance.now();
+    requestAnimationFrame(loop);
+  }
+
+  function levelSpeed() { return R.cfg.speed * (1 + (R.level - 1) * 0.14); }
+  function levelSpawn() { return Math.max(650, R.cfg.spawn * Math.pow(0.9, R.level - 1)); }
+
+  function spawnWord() {
+    if (R.words.length >= R.cfg.max + Math.floor(R.level / 3)) return;
+    // pick a word that doesn't share a first letter with words on screen (easier targeting)
+    let text, tries = 0;
+    const pool = pick(R.cfg.pools);
+    do { text = pick(pool); tries++; } while (tries < 15 && R.words.some((w) => w.text[0] === text[0]));
+    const special = Math.random() < 0.08;
+    const el = document.createElement('div');
+    el.className = 'word' + (special ? ' special' : '');
+    el.innerHTML = '<span class="hit"></span><span class="rest"></span>';
+    el.lastChild.textContent = text;
+    arena.appendChild(el);
+    const aw = arena.clientWidth, ew = el.offsetWidth;
+    const x = 6 + Math.random() * Math.max(0, aw - ew - 12);
+    const w = { text, el, x, y: -40, special, speedMul: special ? 1.35 : (0.85 + Math.random() * 0.3) };
+    el.style.transform = `translate(${x}px, ${w.y}px)`;
+    R.words.push(w);
+  }
+
+  function loop(now) {
+    if (!R || !R.running) return;
+    const dt = Math.min(0.05, (now - R.last) / 1000);
+    R.last = now;
+    if (!R.paused) {
+      R.activeTime += dt;
+      R.spawnT += dt * 1000;
+      if (R.spawnT >= levelSpawn()) { R.spawnT = 0; spawnWord(); }
+      const floor = arena.clientHeight;
+      const sp = levelSpeed();
+      for (let i = R.words.length - 1; i >= 0; i--) {
+        const w = R.words[i];
+        w.y += sp * w.speedMul * dt;
+        w.el.style.transform = `translate(${w.x}px, ${w.y}px)`;
+        w.el.classList.toggle('danger', w.y > floor * 0.7);
+        if (w.y + w.el.offsetHeight >= floor) {
+          missWord(w, i);
+        }
+      }
+      if (R.words.length === 0) spawnWord();
+    }
+    if (R.running) requestAnimationFrame(loop);
+  }
+
+  function missWord(w, i) {
+    R.words.splice(i, 1);
+    w.el.remove();
+    R.lives--; R.combo = 0;
+    sfx.miss();
+    arena.classList.remove('flash'); void arena.offsetWidth; arena.classList.add('flash');
+    updateHud();
+    if (R.lives <= 0) endRain();
+    else markTargets();
+  }
+
+  function markTargets() {
+    const typed = rainInput.value.trim().toLowerCase();
+    let target = null;
+    if (typed) {
+      // lowest (most urgent) word that matches what's typed
+      for (const w of R.words) if (w.text.startsWith(typed) && (!target || w.y > target.y)) target = w;
+    }
+    for (const w of R.words) {
+      const on = w === target;
+      w.el.classList.toggle('target', on);
+      w.el.firstChild.textContent = on ? w.text.slice(0, typed.length) : '';
+      w.el.lastChild.textContent = on ? w.text.slice(typed.length) : w.text;
+    }
+    return { typed, target };
+  }
+
+  let prevLen = 0;
+  rainInput.addEventListener('input', () => {
+    if (!R || !R.running) return;
+    const raw = rainInput.value;
+    // space or enter clears
+    if (/\s/.test(raw)) { rainInput.value = ''; prevLen = 0; rainInput.classList.remove('wrong'); markTargets(); return; }
+    const { typed, target } = markTargets();
+    const grew = typed.length > prevLen;
+    prevLen = typed.length;
+    if (!typed) { rainInput.classList.remove('wrong'); return; }
+    if (grew) R.typedChars++;
+    if (target && target.text === typed) { hitWord(target); return; }
+    if (!target) {
+      rainInput.classList.add('wrong');
+      if (grew) {
+        R.wrongKeys++; R.combo = 0; sfx.wrong(); updateHud();
+        rainInput.classList.remove('shake'); void rainInput.offsetWidth; rainInput.classList.add('shake');
+      }
+    } else {
+      rainInput.classList.remove('wrong');
+      if (grew) sfx.key();
+    }
+  });
+
+  function hitWord(w) {
+    R.words.splice(R.words.indexOf(w), 1);
+    R.combo++; R.bestCombo = Math.max(R.bestCombo, R.combo); R.cleared++;
+    const mult = 1 + Math.floor(R.combo / 5) * 0.5;
+    const pts = Math.round(w.text.length * 10 * R.level * mult * (w.special ? 3 : 1));
+    R.score += pts;
+    if (w.special && R.lives < 5) R.lives++;
+    sfx.hit(R.combo);
+    // effects
+    const cx = w.x + w.el.offsetWidth / 2, cy = w.y + w.el.offsetHeight / 2;
+    w.el.remove();
+    const p = document.createElement('div');
+    p.className = 'pop'; p.textContent = '+' + pts + (w.special ? ' ❤️' : '');
+    p.style.left = (cx - 20) + 'px'; p.style.top = (cy - 10) + 'px';
+    arena.appendChild(p); setTimeout(() => p.remove(), 800);
+    const colors = ['#7c6cff', '#ec4899', '#fbbf24', '#34d399', '#60a5fa'];
+    for (let i = 0; i < 10; i++) {
+      const b = document.createElement('div');
+      b.className = 'burst';
+      const a = Math.random() * Math.PI * 2, r = 30 + Math.random() * 40;
+      b.style.left = cx + 'px'; b.style.top = cy + 'px'; b.style.background = pick(colors);
+      b.style.setProperty('--dx', Math.cos(a) * r + 'px'); b.style.setProperty('--dy', Math.sin(a) * r + 'px');
+      arena.appendChild(b); setTimeout(() => b.remove(), 600);
+    }
+    rainInput.value = ''; prevLen = 0; rainInput.classList.remove('wrong');
+    if (R.cleared % 10 === 0) { R.level++; sfx.level(); banner('Level ' + R.level); }
+    markTargets();
+    updateHud();
+  }
+
+  function banner(text) {
+    const b = document.createElement('div');
+    b.className = 'banner'; b.textContent = text;
+    arena.appendChild(b); setTimeout(() => b.remove(), 1200);
+  }
+
+  function updateHud() {
+    $('rLevel').textContent = R.level;
+    $('rScore').textContent = R.score.toLocaleString();
+    $('rCombo').textContent = R.combo;
+    $('rLives').textContent = R.lives > 0 ? '❤️'.repeat(R.lives) : '💀';
+  }
+
+  function pauseRain(p) {
+    if (!R || !R.running) return;
+    R.paused = p;
+    $('pause').classList.toggle('show', p);
+    if (p) rainInput.blur(); else { R.last = performance.now(); rainInput.focus(); }
+  }
+  $('rainPause').onclick = () => pauseRain(true);
+  $('resumeBtn').onclick = () => pauseRain(false);
+  $('quitBtn').onclick = () => { if (R) R.running = false; $('pause').classList.remove('show'); show('menu'); };
+  arena.addEventListener('pointerdown', () => { if (R && R.running && !R.paused) rainInput.focus(); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden && current === 'rain') pauseRain(true); });
+
+  function endRain() {
+    R.running = false;
+    sfx.over();
+    rainInput.blur();
+    const key = 'bestRain_' + R.diff;
+    const best = store.get(key, 0);
+    const isNew = R.score > best;
+    if (isNew) store.set(key, R.score);
+    const mins = Math.max(R.activeTime / 60, 1 / 60);
+    const acc = R.typedChars ? Math.round(100 * (R.typedChars - R.wrongKeys) / R.typedChars) : 0;
+    const stars = R.level >= 8 ? 3 : R.level >= 4 ? 2 : R.level >= 2 ? 1 : 0;
+    const ranks = ['Keep practicing!', 'Rising Typist', 'Keyboard Hero', 'Typing Master'];
+    showResults({
+      stars, rank: ranks[stars], isNew, again: startRain,
+      stats: [
+        [R.score.toLocaleString(), 'Score'], ['Level ' + R.level, 'Reached'],
+        [R.cleared, 'Words'], [R.bestCombo, 'Best combo'],
+        [acc + '%', 'Accuracy'], [Math.round(R.cleared / mins), 'Words / min'],
+      ],
+    });
+  }
+
+  // =====================================================
+  //  SPEED TEST
+  // =====================================================
+  const speedInput = $('speedInput');
+  const inner = $('textinner');
+  let S = null;
+
+  function makeText(n) {
+    const out = [];
+    let si = Math.floor(Math.random() * SENTENCE_WORDS.length);
+    while (out.length < n) {
+      if (Math.random() < 0.5) { out.push(SENTENCE_WORDS[si % SENTENCE_WORDS.length]); si++; }
+      else out.push(pick(COMMON));
+    }
+    return out;
+  }
+
+  function startSpeed() {
+    unlockAudio();
+    show('speed');
+    const secs = parseInt(getTime(), 10);
+    S = { secs, words: makeText(250), idx: 0, started: false, t0: 0, timer: null,
+          correctChars: 0, totalKeys: 0, wrongKeys: 0, correctWords: 0, wrongWords: 0, done: false };
+    inner.innerHTML = '';
+    inner.style.transform = 'translateY(0)';
+    S.words.forEach((w) => {
+      const s = document.createElement('span');
+      s.className = 'w';
+      for (const ch of w) { const c = document.createElement('span'); c.className = 'c'; c.textContent = ch; s.appendChild(c); }
+      inner.appendChild(s);
+    });
+    speedInput.value = '';
+    $('sTime').textContent = secs; $('sWpm').textContent = 0; $('sAcc').textContent = 100;
+    $('sBar').style.width = '100%';
+    paintCurrent();
+    speedInput.focus();
+  }
+
+  function paintCurrent() {
+    const spans = inner.children;
+    const el = spans[S.idx];
+    if (!el) return;
+    el.classList.add('cur');
+    const typed = speedInput.value.trim();
+    [...el.children].forEach((c, i) => {
+      c.className = 'c' + (i < typed.length ? (typed[i] === c.textContent ? ' ok' : ' no') : '');
+    });
+    // scroll so current line stays near the top
+    const lineTop = el.offsetTop - inner.offsetTop;
+    inner.style.transform = `translateY(${-Math.max(0, lineTop - el.offsetHeight)}px)`;
+  }
+
+  function tick() {
+    const el = (performance.now() - S.t0) / 1000;
+    const left = Math.max(0, S.secs - el);
+    $('sTime').textContent = Math.ceil(left);
+    $('sBar').style.width = (left / S.secs * 100) + '%';
+    $('sWpm').textContent = calcWpm(el);
+    if (left <= 0) endSpeed();
+  }
+  const calcWpm = (secs) => secs > 0.5 ? Math.round((S.correctChars / 5) / (secs / 60)) : 0;
+
+  let sPrev = '';
+  speedInput.addEventListener('input', () => {
+    if (!S || S.done) return;
+    const raw = speedInput.value;
+    if (!S.started && raw.trim()) {
+      S.started = true; S.t0 = performance.now();
+      S.timer = setInterval(tick, 200);
+    }
+    const word = S.words[S.idx];
+    if (/\s/.test(raw)) {
+      const typed = raw.trim();
+      if (!typed) { speedInput.value = ''; sPrev = ''; return; }
+      const el = inner.children[S.idx];
+      el.classList.remove('cur');
+      if (typed === word) { el.classList.add('ok'); S.correctChars += word.length + 1; S.correctWords++; sfx.key(); }
+      else { el.classList.add('no'); S.wrongWords++; sfx.wrong(); }
+      S.idx++; speedInput.value = ''; sPrev = '';
+      paintCurrent();
+      return;
+    }
+    if (raw.length > sPrev.length) {
+      S.totalKeys++;
+      const i = raw.length - 1;
+      if (raw[i] !== word[i]) { S.wrongKeys++; sfx.wrong(); } else sfx.key();
+    }
+    sPrev = raw;
+    speedInput.classList.toggle('wrong', !word.startsWith(raw));
+    $('sAcc').textContent = S.totalKeys ? Math.round(100 * (S.totalKeys - S.wrongKeys) / S.totalKeys) : 100;
+    paintCurrent();
+  });
+
+  $('speedQuit').onclick = () => { if (S) { S.done = true; clearInterval(S.timer); } speedInput.blur(); show('menu'); };
+
+  function endSpeed() {
+    S.done = true; clearInterval(S.timer);
+    speedInput.blur(); speedInput.classList.remove('wrong');
+    sfx.over();
+    const wpm = calcWpm(S.secs);
+    const acc = S.totalKeys ? Math.round(100 * (S.totalKeys - S.wrongKeys) / S.totalKeys) : 0;
+    const key = 'bestSpeed_' + S.secs;
+    const isNew = wpm > store.get(key, 0);
+    if (isNew) store.set(key, wpm);
+    const stars = wpm >= 60 ? 3 : wpm >= 40 ? 2 : wpm >= 20 ? 1 : 0;
+    const ranks = ['Keep practicing!', 'Rising Typist', 'Keyboard Hero', 'Typing Master'];
+    showResults({
+      stars, rank: ranks[stars], isNew, again: startSpeed,
+      stats: [
+        [wpm, 'WPM'], [acc + '%', 'Accuracy'],
+        [S.correctWords, 'Correct words'], [S.wrongWords, 'Mistakes'],
+      ],
+    });
+  }
+
+  // =====================================================
+  //  RESULTS
+  // =====================================================
+  let againFn = null;
+  function showResults({ stars, rank, isNew, stats, again }) {
+    againFn = again;
+    $('resStars').textContent = '⭐'.repeat(stars) + '☆'.repeat(3 - stars);
+    $('resRank').textContent = rank;
+    $('resNew').style.display = isNew ? 'block' : 'none';
+    $('resStats').innerHTML = stats.map(([v, l]) => `<div class="stat"><b>${v}</b><span>${l}</span></div>`).join('');
+    setTimeout(() => show('results'), 400);
+  }
+  $('againBtn').onclick = () => againFn && againFn();
+  $('menuBtn').onclick = () => show('menu');
+
+  $('playRain').onclick = startRain;
+  $('playSpeed').onclick = startSpeed;
+  renderBests();
+
+  // ---------- Offline support ----------
+  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+})();
+</script>
+</body>
+</html>
